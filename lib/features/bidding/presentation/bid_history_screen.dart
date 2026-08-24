@@ -1,7 +1,13 @@
+import 'package:bid_book/features/auth/application/auth_controller.dart';
 import 'package:bid_book/features/bidding/application/bid_history_controller.dart';
 import 'package:bid_book/features/bidding/domain/bid_event.dart';
+import 'package:bid_book/features/marketplace/application/marketplace_actions.dart';
+import 'package:bid_book/features/provider/application/provider_profile_controller.dart';
+import 'package:bid_book/features/requests/application/request_controller.dart';
+import 'package:bid_book/features/requests/domain/service_request.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 class BidHistoryScreen extends ConsumerWidget {
@@ -11,17 +17,52 @@ class BidHistoryScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(authControllerProvider).user;
+    final profile = ref.watch(providerProfileProvider);
+    final requests = ref.watch(serviceRequestsProvider);
+    ServiceRequest? request;
+    for (final item in requests) {
+      if (item.id == requestId) {
+        request = item;
+        break;
+      }
+    }
+    if (request == null) {
+      return const Scaffold(body: Center(child: Text('Request not found.')));
+    }
+    final currentRequest = request;
+
     final events = ref
         .watch(bidHistoryProvider)
         .where((event) => event.requestId == requestId)
         .toList()
       ..sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
 
+    final latestBidIds = <String>{};
+    final seenProviders = <String>{};
+    for (final event in events) {
+      if (seenProviders.add(event.providerId)) latestBidIds.add(event.id);
+    }
+
+    final isOwner = user?.id == currentRequest.createdByUserId;
+    final biddingOpen = currentRequest.status == ServiceRequestStatus.bidding;
+    final canBid =
+        user != null && profile != null && !isOwner && biddingOpen;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Bid history')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 110),
         children: [
+          Text(
+            currentRequest.title,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
+          const SizedBox(height: 8),
+          Text('${currentRequest.area} • ${DateFormat('d MMM, h:mm a').format(currentRequest.requestedFor)}'),
+          const SizedBox(height: 14),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(18),
@@ -32,7 +73,7 @@ class BidHistoryScreen extends ConsumerWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Transparent bidding: every submitted price and every revision remains visible. Older bids are never replaced.',
+                      'Every submitted price and every revision remains visible. Only each provider’s latest offer can be accepted; older offers stay as history.',
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ),
@@ -40,28 +81,64 @@ class BidHistoryScreen extends ConsumerWidget {
               ),
             ),
           ),
+          if (currentRequest.status == ServiceRequestStatus.booked) ...[
+            const SizedBox(height: 12),
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.check_circle_outline),
+                title: const Text('Booking confirmed'),
+                subtitle: Text('Accepted bid event: ${currentRequest.acceptedBidEventId}'),
+                onTap: currentRequest.bookingId == null
+                    ? null
+                    : () => context.go('/bookings/${currentRequest.bookingId}'),
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           if (events.isEmpty)
-            const Center(child: Text('No bids yet.'))
+            const Center(child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Text('No bids yet. Providers can bid while this request is open.'),
+            ))
           else
             ...events.map(
               (event) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child: _BidCard(event: event),
+                child: _BidCard(
+                  event: event,
+                  isCurrentOffer: latestBidIds.contains(event.id),
+                  isAccepted: currentRequest.acceptedBidEventId == event.id,
+                  canAccept: isOwner &&
+                      biddingOpen &&
+                      latestBidIds.contains(event.id),
+                  onAccept: () => _acceptBid(context, ref, event),
+                ),
               ),
             ),
+          if (!isOwner && profile == null && biddingOpen) ...[
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: () => context.go('/provider/onboarding'),
+              icon: const Icon(Icons.handyman_outlined),
+              label: const Text('Set up provider profile to bid'),
+            ),
+          ],
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showBidSheet(context, ref),
-        icon: const Icon(Icons.gavel),
-        label: const Text('Place / revise bid'),
-      ),
+      floatingActionButton: canBid
+          ? FloatingActionButton.extended(
+              onPressed: () => _showBidSheet(context, ref),
+              icon: const Icon(Icons.gavel),
+              label: const Text('Place / revise bid'),
+            )
+          : null,
     );
   }
 
   Future<void> _showBidSheet(BuildContext context, WidgetRef ref) async {
-    final controller = TextEditingController(text: '315');
+    final profile = ref.read(providerProfileProvider);
+    if (profile == null) return;
+    final controller = TextEditingController();
     final amount = await showModalBottomSheet<int>(
       context: context,
       isScrollControlled: true,
@@ -77,19 +154,19 @@ class BidHistoryScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Place revised bid',
+              'Place or revise bid',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
             const Text(
-              'Submitting a new price will add another history entry. Your old price will stay visible.',
+              'A new price creates another permanent history entry. Your previous price remains visible.',
             ),
             const SizedBox(height: 14),
             TextField(
               controller: controller,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
-                labelText: 'Price per unit',
+                labelText: 'Bid amount',
                 prefixText: '₹ ',
               ),
             ),
@@ -113,21 +190,48 @@ class BidHistoryScreen extends ConsumerWidget {
 
     ref.read(bidHistoryProvider.notifier).submitBid(
           requestId: requestId,
-          providerId: 'provider-coolcare',
-          providerName: 'CoolCare Services',
+          providerId: profile.id,
+          providerName: profile.displayName,
           amountPaise: amount,
-          rating: 4.8,
-          completedJobs: 1240,
-          identityVerified: true,
-          note: 'Revised price submitted from the mobile app.',
+          rating: profile.rating,
+          completedJobs: profile.completedJobs,
+          identityVerified: profile.identityVerified,
+          note: 'Submitted from the Bid&Book mobile app.',
         );
+  }
+
+  void _acceptBid(BuildContext context, WidgetRef ref, BidEvent event) {
+    final user = ref.read(authControllerProvider).user;
+    if (user == null) return;
+    try {
+      final booking = ref.read(marketplaceActionsProvider.notifier).acceptBid(
+            requestId: requestId,
+            bidEventId: event.id,
+            customerUserId: user.id,
+          );
+      context.go('/bookings/${booking.id}');
+    } on StateError catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    }
   }
 }
 
 class _BidCard extends StatelessWidget {
-  const _BidCard({required this.event});
+  const _BidCard({
+    required this.event,
+    required this.isCurrentOffer,
+    required this.isAccepted,
+    required this.canAccept,
+    required this.onAccept,
+  });
 
   final BidEvent event;
+  final bool isCurrentOffer;
+  final bool isAccepted;
+  final bool canAccept;
+  final VoidCallback onAccept;
 
   @override
   Widget build(BuildContext context) {
@@ -142,9 +246,7 @@ class _BidCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                CircleAvatar(
-                  child: Text(event.providerName.substring(0, 1)),
-                ),
+                CircleAvatar(child: Text(event.providerName.substring(0, 1))),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -183,6 +285,12 @@ class _BidCard extends StatelessWidget {
               runSpacing: 6,
               children: [
                 Chip(label: Text(isRevision ? 'Revised bid' : 'Initial bid')),
+                Chip(label: Text(isCurrentOffer ? 'Current offer' : 'Historical')),
+                if (isAccepted)
+                  const Chip(
+                    avatar: Icon(Icons.check, size: 16),
+                    label: Text('Accepted'),
+                  ),
                 Text(DateFormat('d MMM • h:mm a').format(submittedLocal)),
               ],
             ),
@@ -195,6 +303,17 @@ class _BidCard extends StatelessWidget {
               Text(
                 'Previous bid retained in history',
                 style: Theme.of(context).textTheme.labelMedium,
+              ),
+            ],
+            if (canAccept) ...[
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: onAccept,
+                  icon: const Icon(Icons.check_circle_outline),
+                  label: const Text('Accept this current offer'),
+                ),
               ),
             ],
           ],
