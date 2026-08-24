@@ -1,6 +1,7 @@
 import 'package:bid_book/features/auth/application/auth_controller.dart';
 import 'package:bid_book/features/bookings/application/booking_controller.dart';
 import 'package:bid_book/features/provider/application/provider_profile_controller.dart';
+import 'package:bid_book/features/provider/domain/provider_profile.dart';
 import 'package:bid_book/features/services/application/service_catalog_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
