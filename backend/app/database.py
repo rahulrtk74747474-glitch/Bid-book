@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.pool import NullPool
 
 from .config import settings
 
@@ -12,11 +13,17 @@ class Base(DeclarativeBase):
     pass
 
 
-engine = create_async_engine(
-    settings.database_url,
-    pool_pre_ping=True,
-    echo=False,
-)
+engine_options: dict[str, object] = {
+    "pool_pre_ping": True,
+    "echo": False,
+}
+# Starlette TestClient creates a fresh event loop per context. asyncpg connections
+# are loop-bound, so tests use NullPool to prevent a connection from one loop
+# being reused by a later test. Production/development retain normal pooling.
+if settings.environment == "test":
+    engine_options["poolclass"] = NullPool
+
+engine = create_async_engine(settings.database_url, **engine_options)
 SessionFactory = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
 
