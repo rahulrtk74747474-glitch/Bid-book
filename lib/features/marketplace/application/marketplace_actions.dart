@@ -28,10 +28,11 @@ class MarketplaceActions extends Notifier<int> {
     if (request == null) {
       throw StateError('Service request not found.');
     }
-    if (request.createdByUserId != customerUserId) {
+    final currentRequest = request;
+    if (currentRequest.createdByUserId != customerUserId) {
       throw StateError('Only the request owner can accept a bid.');
     }
-    if (request.status != ServiceRequestStatus.bidding) {
+    if (currentRequest.status != ServiceRequestStatus.bidding) {
       throw StateError('Bidding is no longer open for this request.');
     }
 
@@ -46,12 +47,13 @@ class MarketplaceActions extends Notifier<int> {
     if (bid == null || bid.requestId != requestId) {
       throw StateError('Bid not found for this request.');
     }
+    final currentBid = bid;
 
     final hasNewerProviderBid = history.any(
       (item) =>
           item.requestId == requestId &&
-          item.providerId == bid!.providerId &&
-          item.submittedAt.isAfter(bid.submittedAt),
+          item.providerId == currentBid.providerId &&
+          item.submittedAt.isAfter(currentBid.submittedAt),
     );
     if (hasNewerProviderBid) {
       throw StateError(
@@ -60,13 +62,13 @@ class MarketplaceActions extends Notifier<int> {
     }
 
     final booking = ref.read(bookingsProvider.notifier).createFromAcceptedBid(
-          request: request,
-          bid: bid,
+          request: currentRequest,
+          bid: currentBid,
           customerUserId: customerUserId,
         );
     ref.read(serviceRequestsProvider.notifier).markBooked(
-          requestId: request.id,
-          bidEventId: bid.id,
+          requestId: currentRequest.id,
+          bidEventId: currentBid.id,
           bookingId: booking.id,
         );
     state++;
