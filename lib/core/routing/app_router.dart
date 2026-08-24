@@ -15,18 +15,21 @@ final appRouter = GoRouter(
       branches: [
         StatefulShellBranch(
           routes: [
-            GoRoute(path: '/', builder: (_, __) => const HomeScreen()),
+            GoRoute(
+              path: '/',
+              builder: (context, state) => const HomeScreen(),
+            ),
           ],
         ),
         StatefulShellBranch(
           routes: [
             GoRoute(
               path: '/requests',
-              builder: (_, __) => const RequestsScreen(),
+              builder: (context, state) => const RequestsScreen(),
               routes: [
                 GoRoute(
                   path: ':requestId/bids',
-                  builder: (_, state) => BidHistoryScreen(
+                  builder: (context, state) => BidHistoryScreen(
                     requestId: state.pathParameters['requestId']!,
                   ),
                 ),
@@ -38,7 +41,7 @@ final appRouter = GoRouter(
           routes: [
             GoRoute(
               path: '/groups',
-              builder: (_, __) => const GroupsScreen(),
+              builder: (context, state) => const GroupsScreen(),
             ),
           ],
         ),
@@ -46,7 +49,7 @@ final appRouter = GoRouter(
           routes: [
             GoRoute(
               path: '/account',
-              builder: (_, __) => const ProfileScreen(),
+              builder: (context, state) => const ProfileScreen(),
             ),
           ],
         ),
