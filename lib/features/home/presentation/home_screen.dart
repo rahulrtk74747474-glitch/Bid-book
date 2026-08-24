@@ -1,5 +1,6 @@
 import 'package:bid_book/features/auth/application/auth_controller.dart';
 import 'package:bid_book/features/services/application/service_catalog_controller.dart';
+import 'package:bid_book/features/services/domain/service_listing.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
