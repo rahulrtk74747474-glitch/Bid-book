@@ -49,7 +49,7 @@ class RequestsScreen extends StatelessWidget {
       body: ListView.separated(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
         itemCount: _requests.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 14),
+        separatorBuilder: (context, index) => const SizedBox(height: 14),
         itemBuilder: (context, index) {
           final request = _requests[index];
           return Card(
