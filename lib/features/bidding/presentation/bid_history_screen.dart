@@ -30,6 +30,7 @@ class BidHistoryScreen extends ConsumerWidget {
     if (request == null) {
       return const Scaffold(body: Center(child: Text('Request not found.')));
     }
+    final currentRequest = request;
 
     final events = ref
         .watch(bidHistoryProvider)
@@ -43,8 +44,8 @@ class BidHistoryScreen extends ConsumerWidget {
       if (seenProviders.add(event.providerId)) latestBidIds.add(event.id);
     }
 
-    final isOwner = user?.id == request.createdByUserId;
-    final biddingOpen = request.status == ServiceRequestStatus.bidding;
+    final isOwner = user?.id == currentRequest.createdByUserId;
+    final biddingOpen = currentRequest.status == ServiceRequestStatus.bidding;
     final canBid =
         user != null && profile != null && !isOwner && biddingOpen;
 
@@ -54,13 +55,13 @@ class BidHistoryScreen extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 110),
         children: [
           Text(
-            request.title,
+            currentRequest.title,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.w800,
                 ),
           ),
           const SizedBox(height: 8),
-          Text('${request.area} • ${DateFormat('d MMM, h:mm a').format(request.requestedFor)}'),
+          Text('${currentRequest.area} • ${DateFormat('d MMM, h:mm a').format(currentRequest.requestedFor)}'),
           const SizedBox(height: 14),
           Card(
             child: Padding(
@@ -80,16 +81,16 @@ class BidHistoryScreen extends ConsumerWidget {
               ),
             ),
           ),
-          if (request.status == ServiceRequestStatus.booked) ...[
+          if (currentRequest.status == ServiceRequestStatus.booked) ...[
             const SizedBox(height: 12),
             Card(
               child: ListTile(
                 leading: const Icon(Icons.check_circle_outline),
                 title: const Text('Booking confirmed'),
-                subtitle: Text('Accepted bid event: ${request.acceptedBidEventId}'),
-                onTap: request.bookingId == null
+                subtitle: Text('Accepted bid event: ${currentRequest.acceptedBidEventId}'),
+                onTap: currentRequest.bookingId == null
                     ? null
-                    : () => context.go('/bookings/${request.bookingId}'),
+                    : () => context.go('/bookings/${currentRequest.bookingId}'),
               ),
             ),
           ],
@@ -106,7 +107,7 @@ class BidHistoryScreen extends ConsumerWidget {
                 child: _BidCard(
                   event: event,
                   isCurrentOffer: latestBidIds.contains(event.id),
-                  isAccepted: request!.acceptedBidEventId == event.id,
+                  isAccepted: currentRequest.acceptedBidEventId == event.id,
                   canAccept: isOwner &&
                       biddingOpen &&
                       latestBidIds.contains(event.id),
