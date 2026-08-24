@@ -1,7 +1,11 @@
+import 'package:bid_book/features/auth/application/auth_controller.dart';
+import 'package:bid_book/features/services/application/service_catalog_controller.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   static const _services = [
@@ -14,7 +18,13 @@ class HomeScreen extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentUserId = ref.watch(authControllerProvider).user?.id;
+    final listings = ref
+        .watch(serviceCatalogProvider)
+        .where((item) => item.active && item.ownerUserId != currentUserId)
+        .toList();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Bid&Book'),
@@ -80,11 +90,72 @@ class HomeScreen extends StatelessWidget {
             },
           ),
           const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Services near you',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+              TextButton(
+                onPressed: () => context.go('/requests'),
+                child: const Text('Requests'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...listings.take(4).map(
+                (listing) => Card(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                listing.title,
+                                style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            if (listing.identityVerified)
+                              const Icon(Icons.verified, size: 18),
+                          ],
+                        ),
+                        const SizedBox(height: 5),
+                        Text('${listing.providerName} • ${listing.area}'),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '₹${NumberFormat.decimalPattern('en_IN').format(listing.priceRupees.round())} • ${listing.pricingUnit.label}',
+                                style: const TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                            FilledButton(
+                              onPressed: () => context.go('/services/${listing.id}'),
+                              child: const Text('Book'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          const SizedBox(height: 12),
           _FeatureCard(
             icon: Icons.campaign_outlined,
             title: 'Post a request',
             subtitle: 'Describe the job and compare transparent bids.',
-            onTap: () => context.go('/requests'),
+            onTap: () => context.go('/requests/new'),
           ),
           const SizedBox(height: 12),
           _FeatureCard(
