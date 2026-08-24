@@ -1,4 +1,5 @@
 import 'package:bid_book/features/provider/application/provider_profile_controller.dart';
+import 'package:bid_book/features/provider/domain/provider_profile.dart';
 import 'package:bid_book/features/services/application/service_catalog_controller.dart';
 import 'package:bid_book/features/services/domain/service_listing.dart';
 import 'package:flutter/material.dart';
@@ -131,7 +132,7 @@ class _AddServiceListingScreenState
     );
   }
 
-  void _save(profile) {
+  void _save(ProviderProfile profile) {
     final rupees = int.tryParse(_priceController.text.trim());
     if (rupees == null || rupees <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(

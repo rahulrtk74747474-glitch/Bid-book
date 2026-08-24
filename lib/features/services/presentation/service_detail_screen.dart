@@ -1,6 +1,7 @@
 import 'package:bid_book/features/auth/application/auth_controller.dart';
 import 'package:bid_book/features/bookings/application/booking_controller.dart';
 import 'package:bid_book/features/services/application/service_catalog_controller.dart';
+import 'package:bid_book/features/services/domain/service_listing.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -28,7 +29,13 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final listings = ref.watch(serviceCatalogProvider);
-    final listing = listings.where((item) => item.id == widget.listingId).firstOrNull;
+    ServiceListing? listing;
+    for (final item in listings) {
+      if (item.id == widget.listingId) {
+        listing = item;
+        break;
+      }
+    }
     final user = ref.watch(authControllerProvider).user;
 
     if (listing == null) {
@@ -93,7 +100,7 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
           ),
           const SizedBox(height: 20),
           FilledButton.icon(
-            onPressed: isOwnListing ? null : () => _book(listing),
+            onPressed: isOwnListing ? null : () => _book(listing!),
             icon: const Icon(Icons.calendar_month_outlined),
             label: Text(isOwnListing ? 'This is your listing' : 'Book service'),
           ),
@@ -120,7 +127,7 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
     });
   }
 
-  void _book(listing) {
+  void _book(ServiceListing listing) {
     final user = ref.read(authControllerProvider).user;
     if (user == null) return;
     try {
