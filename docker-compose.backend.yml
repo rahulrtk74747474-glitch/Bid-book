@@ -1,0 +1,35 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: bidbook
+      POSTGRES_USER: bidbook
+      POSTGRES_PASSWORD: bidbook-local-only
+    ports:
+      - "5432:5432"
+    volumes:
+      - bidbook_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bidbook -d bidbook"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./backend
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql+asyncpg://bidbook:bidbook-local-only@postgres:5432/bidbook
+      JWT_SECRET: development-only-change-me-development-only-change-me
+      OTP_PEPPER: development-only-change-me-otp-pepper
+      EXPOSE_DEVELOPMENT_OTP: "true"
+      AUTO_CREATE_TABLES: "true"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  bidbook_pg:

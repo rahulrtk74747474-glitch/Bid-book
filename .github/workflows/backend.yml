@@ -1,0 +1,58 @@
+name: Backend checks
+
+on:
+  pull_request:
+    paths:
+      - "backend/**"
+      - "docker-compose.backend.yml"
+      - ".github/workflows/backend.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "docker-compose.backend.yml"
+      - ".github/workflows/backend.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: bidbook_test
+          POSTGRES_USER: bidbook
+          POSTGRES_PASSWORD: bidbook_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bidbook -d bidbook_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      ENVIRONMENT: test
+      DATABASE_URL: postgresql+asyncpg://bidbook:bidbook_test_password@127.0.0.1:5432/bidbook_test
+      JWT_SECRET: test-secret-that-is-long-enough-for-ci-only-not-production-1234567890
+      OTP_PEPPER: test-otp-pepper-that-is-long-enough-for-ci-only-1234567890
+      EXPOSE_DEVELOPMENT_OTP: "true"
+      AUTO_CREATE_TABLES: "true"
+      OTP_COOLDOWN_SECONDS: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: Ruff
+        run: ruff check app tests
+      - name: Compile
+        run: python -m compileall -q app
+      - name: Tests
+        run: pytest -q
