@@ -45,7 +45,7 @@ class RemoteTrustController extends AsyncNotifier<RemoteTrustState> {
   Future<RemoteTrustState> build() async {
     final auth = ref.watch(remoteAuthControllerProvider).asData?.value;
     if (auth?.isAuthenticated != true) {
-      return RemoteTrustState(
+      return const RemoteTrustState(
         overview: TrustOverview(
           identityVerified: false,
           paymentsCount: 0,
