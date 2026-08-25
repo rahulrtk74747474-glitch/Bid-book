@@ -1,6 +1,6 @@
 [project]
 name = "bidbook-api"
-version = "0.2.0"
+version = "0.3.0"
 description = "Secure backend API for Bid&Book"
 requires-python = ">=3.12"
 dependencies = [
@@ -9,6 +9,9 @@ dependencies = [
   "SQLAlchemy[asyncio]==2.0.52",
   "asyncpg>=0.29,<1",
   "PyJWT[crypto]==2.13.0",
+  "pwdlib[argon2]==0.3.1",
+  "google-auth==2.56.3",
+  "requests>=2.32,<3",
 ]
 
 [project.optional-dependencies]
