@@ -1,0 +1,65 @@
+name: Build Android Test APK
+
+on:
+  push:
+    branches: [apk-test-build]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate Android shell
+        run: |
+          if [ ! -d android ]; then
+            flutter create . --platforms=android --org com.bidbook --project-name bid_book
+          fi
+
+      - name: Allow local HTTP for debug testing
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('android/app/src/main/AndroidManifest.xml')
+          text = p.read_text()
+          if 'android:usesCleartextTraffic=' not in text:
+              text = text.replace('<application', '<application\n        android:usesCleartextTraffic="true"', 1)
+          p.write_text(text)
+          PY
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build debug APK
+        run: flutter build apk --debug --dart-define=BIDBOOK_API_BASE_URL=http://127.0.0.1:8000
+
+      - name: Prepare APK
+        run: |
+          mkdir -p artifacts
+          cp build/app/outputs/flutter-apk/app-debug.apk artifacts/BidBook-Android-Test.apk
+          ls -lh artifacts/BidBook-Android-Test.apk
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BidBook-Android-Test-APK
+          path: artifacts/BidBook-Android-Test.apk
+          retention-days: 14
+
+      - name: Commit APK to test branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f artifacts/BidBook-Android-Test.apk
+          git commit -m "Build Android test APK" || exit 0
+          git push origin HEAD:apk-test-build
