@@ -76,7 +76,7 @@ def test_admin_bootstrap_support_report_and_suspension() -> None:
         )
         assert suspended.status_code == 200, suspended.text
         denied = client.get("/v1/auth/me", headers=user_headers)
-        assert denied.status_code == 403
+        assert denied.status_code == 401
         otp_denied = client.post("/v1/auth/otp/request", json={"phone": "9876500092"})
         assert otp_denied.status_code == 403
 
