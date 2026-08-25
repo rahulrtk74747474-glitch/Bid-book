@@ -1,94 +1,114 @@
+import 'package:bid_book/features/groups/application/remote_group_controller.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
-class GroupsScreen extends StatelessWidget {
+class GroupsScreen extends ConsumerWidget {
   const GroupsScreen({super.key});
 
+  Future<void> _createGroup(BuildContext context, WidgetRef ref) async {
+    final name = TextEditingController();
+    final area = TextEditingController();
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Create neighborhood group'),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          TextField(controller: name, decoration: const InputDecoration(labelText: 'Group name')),
+          const SizedBox(height: 10),
+          TextField(controller: area, decoration: const InputDecoration(labelText: 'Area / locality')),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Create')),
+        ],
+      ),
+    );
+    if (result != true) return;
+    try {
+      final group = await ref.read(remoteGroupControllerProvider.notifier).createGroup(
+            name: name.text.trim(),
+            area: area.text.trim(),
+          );
+      if (context.mounted) context.push('/groups/${group.id}');
+    } catch (error) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$error')));
+    }
+  }
+
+  Future<void> _joinGroup(BuildContext context, WidgetRef ref) async {
+    final code = TextEditingController();
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Join group'),
+        content: TextField(
+          controller: code,
+          textCapitalization: TextCapitalization.characters,
+          decoration: const InputDecoration(labelText: 'Invite code'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Join')),
+        ],
+      ),
+    );
+    if (result != true) return;
+    try {
+      await ref.read(remoteGroupControllerProvider.notifier).joinGroup(code.text);
+    } catch (error) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$error')));
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final groups = ref.watch(remoteGroupControllerProvider);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Neighborhood groups'),
         actions: [
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.group_add_outlined),
-          ),
+          IconButton(onPressed: () => _joinGroup(context, ref), icon: const Icon(Icons.group_add_outlined), tooltip: 'Join group'),
+          IconButton(onPressed: () => _createGroup(context, ref), icon: const Icon(Icons.add_circle_outline), tooltip: 'Create group'),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {},
-        icon: const Icon(Icons.add),
-        label: const Text('Create group'),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
-        children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      CircleAvatar(child: Icon(Icons.apartment)),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Green Residency',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            Text('Sector 15, Sonipat • 127 members'),
-                          ],
-                        ),
+      body: groups.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, _) => Center(child: Text('$error')),
+        data: (data) => RefreshIndicator(
+          onRefresh: () => ref.read(remoteGroupControllerProvider.notifier).refreshGroups(),
+          child: data.groups.isEmpty
+              ? ListView(
+                  padding: const EdgeInsets.all(24),
+                  children: [
+                    const SizedBox(height: 120),
+                    const Icon(Icons.groups_2_outlined, size: 60),
+                    const SizedBox(height: 12),
+                    const Text('Create a local group or join one with an invite code.', textAlign: TextAlign.center),
+                    const SizedBox(height: 18),
+                    FilledButton(onPressed: () => _createGroup(context, ref), child: const Text('Create group')),
+                    OutlinedButton(onPressed: () => _joinGroup(context, ref), child: const Text('Join with code')),
+                  ],
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: data.groups.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final group = data.groups[index];
+                    return Card(
+                      child: ListTile(
+                        onTap: () => context.push('/groups/${group.id}'),
+                        leading: const CircleAvatar(child: Icon(Icons.apartment_outlined)),
+                        title: Text(group.name),
+                        subtitle: Text('${group.area}\nInvite: ${group.inviteCode}'),
+                        isThreeLine: true,
+                        trailing: const Icon(Icons.chevron_right),
                       ),
-                      Chip(label: Text('Admin')),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-                  Text(
-                    'Active proposal',
-                    style: Theme.of(context).textTheme.labelLarge,
-                  ),
-                  const SizedBox(height: 7),
-                  Text(
-                    'AC servicing on 10 September',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                  ),
-                  const SizedBox(height: 8),
-                  const LinearProgressIndicator(value: 0.72),
-                  const SizedBox(height: 8),
-                  const Text('72% responded • 47 interested'),
-                  const SizedBox(height: 16),
-                  const Row(
-                    children: [
-                      Expanded(child: OutlinedButton(onPressed: null, child: Text('Reject'))),
-                      SizedBox(width: 10),
-                      Expanded(child: FilledButton(onPressed: null, child: Text('Interested'))),
-                    ],
-                  ),
-                  const Divider(height: 32),
-                  const ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(Icons.gavel_outlined),
-                    title: Text('Next step: publish for provider bidding'),
-                    subtitle: Text(
-                      'When the group requirement is approved, independent workers and companies can bid and every bid remains in history.',
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
+                    );
+                  },
+                ),
+        ),
       ),
     );
   }

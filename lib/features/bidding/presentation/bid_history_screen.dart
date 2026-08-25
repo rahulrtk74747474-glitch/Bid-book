@@ -1,323 +1,164 @@
-import 'package:bid_book/features/auth/application/auth_controller.dart';
-import 'package:bid_book/features/bidding/application/bid_history_controller.dart';
-import 'package:bid_book/features/bidding/domain/bid_event.dart';
-import 'package:bid_book/features/marketplace/application/marketplace_actions.dart';
-import 'package:bid_book/features/provider/application/provider_profile_controller.dart';
-import 'package:bid_book/features/requests/application/request_controller.dart';
-import 'package:bid_book/features/requests/domain/service_request.dart';
+import 'package:bid_book/core/api/api_models.dart';
+import 'package:bid_book/features/auth/application/remote_auth_controller.dart';
+import 'package:bid_book/features/marketplace/application/remote_marketplace_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-class BidHistoryScreen extends ConsumerWidget {
-  const BidHistoryScreen({required this.requestId, super.key});
-
+class BidHistoryScreen extends ConsumerStatefulWidget {
+  const BidHistoryScreen({super.key, required this.requestId});
   final String requestId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(authControllerProvider).user;
-    final profile = ref.watch(providerProfileProvider);
-    final requests = ref.watch(serviceRequestsProvider);
-    ServiceRequest? request;
-    for (final item in requests) {
-      if (item.id == requestId) {
+  ConsumerState<BidHistoryScreen> createState() => _BidHistoryScreenState();
+}
+
+class _BidHistoryScreenState extends ConsumerState<BidHistoryScreen> {
+  final _amount = TextEditingController();
+  final _note = TextEditingController();
+  bool _submitting = false;
+  String? _awardingBidId;
+
+  @override
+  void dispose() {
+    _amount.dispose();
+    _note.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final rupees = double.tryParse(_amount.text.trim());
+    if (rupees == null || rupees <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid bid amount.')));
+      return;
+    }
+    setState(() => _submitting = true);
+    try {
+      await ref.read(remoteMarketplaceProvider.notifier).submitBid(
+            requestId: widget.requestId,
+            amountPaise: (rupees * 100).round(),
+            note: _note.text.trim(),
+          );
+      _amount.clear();
+      _note.clear();
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$error')));
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  Future<void> _award(ApiBid bid) async {
+    setState(() => _awardingBidId = bid.id);
+    try {
+      final booking = await ref.read(remoteMarketplaceProvider.notifier).awardBid(
+            requestId: widget.requestId,
+            bidId: bid.id,
+          );
+      if (mounted) context.go('/bookings/${booking.id}');
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$error')));
+    } finally {
+      if (mounted) setState(() => _awardingBidId = null);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final marketplace = ref.watch(remoteMarketplaceProvider).asData?.value;
+    final userId = ref.watch(remoteAuthControllerProvider).asData?.value.user?.id;
+    ApiRequest? request;
+    for (final item in marketplace?.requests ?? const <ApiRequest>[]) {
+      if (item.id == widget.requestId) {
         request = item;
         break;
       }
     }
-    if (request == null) {
-      return const Scaffold(body: Center(child: Text('Request not found.')));
-    }
-    final currentRequest = request;
-
-    final events = ref
-        .watch(bidHistoryProvider)
-        .where((event) => event.requestId == requestId)
-        .toList()
-      ..sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
-
-    final latestBidIds = <String>{};
-    final seenProviders = <String>{};
-    for (final event in events) {
-      if (seenProviders.add(event.providerId)) latestBidIds.add(event.id);
-    }
-
-    final isOwner = user?.id == currentRequest.createdByUserId;
-    final biddingOpen = currentRequest.status == ServiceRequestStatus.bidding;
-    final canBid =
-        user != null && profile != null && !isOwner && biddingOpen;
+    final bids = ref.watch(remoteBidHistoryProvider(widget.requestId));
+    final isOwner = request?.createdByUserId == userId;
+    final canBid = marketplace?.provider != null && !isOwner && request?.status == ApiRequestStatus.bidding;
+    final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹');
+    final date = DateFormat('dd MMM, h:mm a');
 
     return Scaffold(
       appBar: AppBar(title: const Text('Bid history')),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 110),
+        padding: const EdgeInsets.all(16),
         children: [
-          Text(
-            currentRequest.title,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-          ),
-          const SizedBox(height: 8),
-          Text('${currentRequest.area} • ${DateFormat('d MMM, h:mm a').format(currentRequest.requestedFor)}'),
-          const SizedBox(height: 14),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(18),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.visibility_outlined),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Every submitted price and every revision remains visible. Only each provider’s latest offer can be accepted; older offers stay as history.',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (currentRequest.status == ServiceRequestStatus.booked) ...[
-            const SizedBox(height: 12),
-            Card(
-              child: ListTile(
-                leading: const Icon(Icons.check_circle_outline),
-                title: const Text('Booking confirmed'),
-                subtitle: Text('Accepted bid event: ${currentRequest.acceptedBidEventId}'),
-                onTap: currentRequest.bookingId == null
-                    ? null
-                    : () => context.go('/bookings/${currentRequest.bookingId}'),
-              ),
-            ),
-          ],
-          const SizedBox(height: 16),
-          if (events.isEmpty)
-            const Center(child: Padding(
-              padding: EdgeInsets.all(24),
-              child: Text('No bids yet. Providers can bid while this request is open.'),
-            ))
-          else
-            ...events.map(
-              (event) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _BidCard(
-                  event: event,
-                  isCurrentOffer: latestBidIds.contains(event.id),
-                  isAccepted: currentRequest.acceptedBidEventId == event.id,
-                  canAccept: isOwner &&
-                      biddingOpen &&
-                      latestBidIds.contains(event.id),
-                  onAccept: () => _acceptBid(context, ref, event),
-                ),
-              ),
-            ),
-          if (!isOwner && profile == null && biddingOpen) ...[
-            const SizedBox(height: 10),
-            OutlinedButton.icon(
-              onPressed: () => context.go('/provider/onboarding'),
-              icon: const Icon(Icons.handyman_outlined),
-              label: const Text('Set up provider profile to bid'),
-            ),
-          ],
-        ],
-      ),
-      floatingActionButton: canBid
-          ? FloatingActionButton.extended(
-              onPressed: () => _showBidSheet(context, ref),
-              icon: const Icon(Icons.gavel),
-              label: const Text('Place / revise bid'),
-            )
-          : null,
-    );
-  }
-
-  Future<void> _showBidSheet(BuildContext context, WidgetRef ref) async {
-    final profile = ref.read(providerProfileProvider);
-    if (profile == null) return;
-    final controller = TextEditingController();
-    final amount = await showModalBottomSheet<int>(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          20,
-          20,
-          MediaQuery.viewInsetsOf(context).bottom + 20,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Place or revise bid',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
+          if (request != null) ...[
+            Text(request.title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 6),
+            Text('${request.category} • ${request.area}'),
             const SizedBox(height: 8),
-            const Text(
-              'A new price creates another permanent history entry. Your previous price remains visible.',
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Bid amount',
-                prefixText: '₹ ',
+            Text(request.description),
+            const SizedBox(height: 18),
+          ],
+          if (canBid) ...[
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text('Place or revise your bid', style: TextStyle(fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _amount,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(labelText: 'Bid amount ₹'),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(controller: _note, decoration: const InputDecoration(labelText: 'Note / inclusions (optional)')),
+                    const SizedBox(height: 12),
+                    FilledButton(
+                      onPressed: _submitting ? null : _submit,
+                      child: Text(_submitting ? 'Submitting…' : 'Submit bid'),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text('Rebidding always appends a new event. Your older prices remain permanently visible.', style: TextStyle(fontSize: 12)),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 14),
-            FilledButton(
-              onPressed: () {
-                final rupees = int.tryParse(controller.text.trim());
-                if (rupees != null && rupees > 0) {
-                  Navigator.pop(context, rupees * 100);
-                }
-              },
-              child: const Text('Submit bid'),
-            ),
+            const SizedBox(height: 16),
           ],
-        ),
-      ),
-    );
-
-    controller.dispose();
-    if (amount == null) return;
-
-    ref.read(bidHistoryProvider.notifier).submitBid(
-          requestId: requestId,
-          providerId: profile.id,
-          providerName: profile.displayName,
-          amountPaise: amount,
-          rating: profile.rating,
-          completedJobs: profile.completedJobs,
-          identityVerified: profile.identityVerified,
-          note: 'Submitted from the Bid&Book mobile app.',
-        );
-  }
-
-  void _acceptBid(BuildContext context, WidgetRef ref, BidEvent event) {
-    final user = ref.read(authControllerProvider).user;
-    if (user == null) return;
-    try {
-      final booking = ref.read(marketplaceActionsProvider.notifier).acceptBid(
-            requestId: requestId,
-            bidEventId: event.id,
-            customerUserId: user.id,
-          );
-      context.go('/bookings/${booking.id}');
-    } on StateError catch (error) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.message)),
-      );
-    }
-  }
-}
-
-class _BidCard extends StatelessWidget {
-  const _BidCard({
-    required this.event,
-    required this.isCurrentOffer,
-    required this.isAccepted,
-    required this.canAccept,
-    required this.onAccept,
-  });
-
-  final BidEvent event;
-  final bool isCurrentOffer;
-  final bool isAccepted;
-  final bool canAccept;
-  final VoidCallback onAccept;
-
-  @override
-  Widget build(BuildContext context) {
-    final isRevision = event.type == BidEventType.revisedBid;
-    final submittedLocal = event.submittedAt.toLocal();
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(child: Text(event.providerName.substring(0, 1))),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              event.providerName,
-                              style: const TextStyle(fontWeight: FontWeight.w700),
-                            ),
-                          ),
-                          if (event.identityVerified) ...[
-                            const SizedBox(width: 5),
-                            const Icon(Icons.verified, size: 17),
+          Text('Complete history', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+          const SizedBox(height: 8),
+          bids.when(
+            loading: () => const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator())),
+            error: (error, _) => Card(child: Padding(padding: const EdgeInsets.all(16), child: Text('$error'))),
+            data: (items) {
+              if (items.isEmpty) return const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('No bids yet.')));
+              return Column(
+                children: items.map((bid) => Card(
+                      child: ListTile(
+                        leading: CircleAvatar(child: Icon(bid.isRevision ? Icons.update : Icons.gavel_outlined)),
+                        title: Row(
+                          children: [
+                            Expanded(child: Text(bid.providerLabel)),
+                            Text(currency.format(bid.amountRupees), style: const TextStyle(fontWeight: FontWeight.w800)),
                           ],
-                        ],
+                        ),
+                        subtitle: Text(
+                          '${bid.isRevision ? 'Revised bid' : 'Initial bid'} • ${date.format(bid.submittedAt)}\n${bid.note ?? 'No note'}',
+                        ),
+                        isThreeLine: true,
+                        trailing: isOwner && bid.isCurrentOffer && request?.status == ApiRequestStatus.bidding
+                            ? FilledButton(
+                                onPressed: _awardingBidId == null ? () => _award(bid) : null,
+                                child: Text(_awardingBidId == bid.id ? 'Accepting…' : 'Accept'),
+                              )
+                            : Icon(
+                                bid.isCurrentOffer ? Icons.check_circle_outline : Icons.history,
+                                semanticLabel: bid.isCurrentOffer ? 'Current offer' : 'Historical offer',
+                              ),
                       ),
-                      Text('★ ${event.rating} • ${event.completedJobs} jobs'),
-                    ],
-                  ),
-                ),
-                Text(
-                  '₹${NumberFormat.decimalPattern('en_IN').format(event.amountRupees.round())}',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 8,
-              runSpacing: 6,
-              children: [
-                Chip(label: Text(isRevision ? 'Revised bid' : 'Initial bid')),
-                Chip(label: Text(isCurrentOffer ? 'Current offer' : 'Historical')),
-                if (isAccepted)
-                  const Chip(
-                    avatar: Icon(Icons.check, size: 16),
-                    label: Text('Accepted'),
-                  ),
-                Text(DateFormat('d MMM • h:mm a').format(submittedLocal)),
-              ],
-            ),
-            if (event.note != null) ...[
-              const SizedBox(height: 8),
-              Text(event.note!),
-            ],
-            if (event.previousBidEventId != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Previous bid retained in history',
-                style: Theme.of(context).textTheme.labelMedium,
-              ),
-            ],
-            if (canAccept) ...[
-              const SizedBox(height: 14),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: onAccept,
-                  icon: const Icon(Icons.check_circle_outline),
-                  label: const Text('Accept this current offer'),
-                ),
-              ),
-            ],
-          ],
-        ),
+                    )).toList(),
+              );
+            },
+          ),
+        ],
       ),
     );
   }

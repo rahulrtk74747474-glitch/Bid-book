@@ -1,8 +1,6 @@
-import 'package:bid_book/features/auth/application/auth_controller.dart';
-import 'package:bid_book/features/bookings/application/booking_controller.dart';
-import 'package:bid_book/features/provider/application/provider_profile_controller.dart';
-import 'package:bid_book/features/provider/domain/provider_profile.dart';
-import 'package:bid_book/features/services/application/service_catalog_controller.dart';
+import 'package:bid_book/core/api/api_models.dart';
+import 'package:bid_book/features/auth/application/remote_auth_controller.dart';
+import 'package:bid_book/features/marketplace/application/remote_marketplace_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,122 +10,60 @@ class ProfileScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final auth = ref.watch(authControllerProvider);
-    final profile = ref.watch(providerProfileProvider);
-    final myServices = ref
-        .watch(serviceCatalogProvider)
-        .where((item) => item.ownerUserId == auth.user?.id)
-        .length;
-    final myBookings = ref
-        .watch(bookingsProvider)
-        .where((item) => item.customerUserId == auth.user?.id)
-        .length;
+    final auth = ref.watch(remoteAuthControllerProvider).asData?.value;
+    final marketplace = ref.watch(remoteMarketplaceProvider).asData?.value;
+    final user = auth?.user;
+    final provider = marketplace?.provider;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Account')),
       body: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         children: [
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(18),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const CircleAvatar(
-                    radius: 38,
-                    child: Icon(Icons.person, size: 38),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    profile?.displayName ?? 'Your profile',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 5),
-                  Text(auth.user?.phoneNumber ?? ''),
-                  const SizedBox(height: 5),
-                  const Text('Customer + service provider in one account'),
-                  const SizedBox(height: 14),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    alignment: WrapAlignment.center,
-                    children: [
-                      const Chip(
-                        avatar: Icon(Icons.phone_android, size: 16),
-                        label: Text('Mobile verified'),
-                      ),
-                      Chip(
-                        avatar: Icon(
-                          profile?.identityVerified == true
-                              ? Icons.verified_user
-                              : Icons.verified_user_outlined,
-                          size: 16,
-                        ),
-                        label: Text(
-                          profile?.identityVerified == true
-                              ? 'Identity verified'
-                              : 'Identity pending',
-                        ),
-                      ),
-                    ],
-                  ),
+                  Text(user?.bestName ?? 'Account', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 6),
+                  Text(user?.phone ?? ''),
+                  const SizedBox(height: 10),
+                  Wrap(spacing: 8, children: [
+                    Chip(label: Text(user?.phoneVerified == true ? 'Phone verified' : 'Phone unverified')),
+                    Chip(label: Text(user?.identityVerified == true ? 'Identity verified' : 'Identity not verified')),
+                  ]),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           ListTile(
             leading: const Icon(Icons.handyman_outlined),
-            title: Text(
-              profile == null ? 'Start offering services' : 'Provider profile',
-            ),
-            subtitle: Text(
-              profile == null
-                  ? 'Independent workers and companies can join'
-                  : '${profile.kind.label} • ${profile.serviceArea}',
-            ),
+            title: Text(provider == null ? 'Become a service provider' : provider.displayName),
+            subtitle: Text(provider == null ? 'Independent workers and companies can offer services.' : '${provider.kind.label} • ${provider.serviceArea}'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.go('/provider/onboarding'),
+            onTap: () => context.push('/provider/onboarding'),
           ),
-          if (profile != null)
+          if (provider != null)
             ListTile(
               leading: const Icon(Icons.add_business_outlined),
-              title: const Text('Post a service'),
-              subtitle: Text('$myServices active service listing(s)'),
+              title: const Text('Publish a service'),
               trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.go('/services/new'),
+              onTap: () => context.push('/services/new'),
             ),
           ListTile(
-            leading: const Icon(Icons.calendar_month_outlined),
+            leading: const Icon(Icons.event_available_outlined),
             title: const Text('My bookings'),
-            subtitle: Text('$myBookings booking(s)'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.go('/bookings'),
+            onTap: () => context.push('/bookings'),
           ),
-          const ListTile(
-            leading: Icon(Icons.verified_user_outlined),
-            title: Text('Identity verification'),
-            subtitle: Text('Verification integration is the next security service'),
-            trailing: Icon(Icons.chevron_right),
-          ),
-          const ListTile(
-            leading: Icon(Icons.account_balance_outlined),
-            title: Text('Payments & payouts'),
-            subtitle: Text('Payment gateway integration comes after booking APIs'),
-            trailing: Icon(Icons.chevron_right),
-          ),
-          const ListTile(
-            leading: Icon(Icons.security_outlined),
-            title: Text('Security & devices'),
-            trailing: Icon(Icons.chevron_right),
-          ),
-          const SizedBox(height: 10),
-          OutlinedButton.icon(
-            onPressed: () {
-              ref.read(authControllerProvider.notifier).signOut();
-            },
-            icon: const Icon(Icons.logout),
-            label: const Text('Sign out'),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.logout),
+            title: const Text('Sign out'),
+            onTap: () => ref.read(remoteAuthControllerProvider.notifier).signOut(),
           ),
         ],
       ),
