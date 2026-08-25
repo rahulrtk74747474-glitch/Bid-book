@@ -133,6 +133,15 @@ class ProductionApi {
 
   Future<Map<String, dynamic>> completeMedia(String mediaId) async =>
       _map(await _client.post('/production/media/$mediaId/complete'));
+
+  Future<List<Map<String, dynamic>>> media({
+    required String entityType,
+    required String entityId,
+  }) async =>
+      _list(await _client.get('/ops/media', query: {
+        'entity_type': entityType,
+        'entity_id': entityId,
+      }));
 }
 
 String? _nullable(String? value) {
