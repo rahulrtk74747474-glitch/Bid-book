@@ -75,13 +75,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         .firstOrNull;
     final messages = ref.watch(remoteChatMessagesProvider(widget.chatId));
     final time = DateFormat('h:mm a');
+    final bookingLabel = thread?.bookingId;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(thread?.counterpartName ?? 'Chat'),
-        subtitle: thread?.bookingId == null
-            ? null
-            : Text('Booking ${thread!.bookingId!.substring(0, 8)}'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(thread?.counterpartName ?? 'Chat'),
+            if (bookingLabel != null)
+              Text(
+                'Booking ${bookingLabel.substring(0, 8)}',
+                style: Theme.of(context).textTheme.labelSmall,
+              ),
+          ],
+        ),
       ),
       body: Column(
         children: [
