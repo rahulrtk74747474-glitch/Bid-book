@@ -103,6 +103,7 @@ class ProviderPayout(Base):
     amount_paise: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[PayoutStatus] = mapped_column(Enum(PayoutStatus), default=PayoutStatus.pending, index=True)
     hold_reason: Mapped[str | None] = mapped_column(String(240))
+    gateway_reference: Mapped[str | None] = mapped_column(String(160), unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     eligible_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
