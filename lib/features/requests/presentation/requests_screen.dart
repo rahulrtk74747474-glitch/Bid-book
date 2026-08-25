@@ -26,13 +26,15 @@ class RequestsScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => _Error(error: error, onRetry: () => ref.invalidate(remoteMarketplaceProvider)),
         data: (data) {
-          if (data.requests.isEmpty) return const Center(child: Text('No service requests yet.'));
+          if (data.requests.isEmpty) {
+            return const Center(child: Text('No service requests yet.'));
+          }
           return RefreshIndicator(
             onRefresh: () => ref.read(remoteMarketplaceProvider.notifier).refreshAll(),
             child: ListView.separated(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
               itemCount: data.requests.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              separatorBuilder: (_, _) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
                 final request = data.requests[index];
                 final mine = request.createdByUserId == userId;
@@ -40,10 +42,14 @@ class RequestsScreen extends ConsumerWidget {
                   child: ListTile(
                     onTap: () => context.push('/requests/${request.id}/bids'),
                     leading: CircleAvatar(
-                      child: Icon(request.groupId == null ? Icons.person_outline : Icons.groups_2_outlined),
+                      child: Icon(request.groupId == null
+                          ? Icons.person_outline
+                          : Icons.groups_2_outlined),
                     ),
                     title: Text(request.title),
-                    subtitle: Text('${request.category} • ${request.area}\n${date.format(request.requestedFor)}${mine ? ' • Your request' : ''}'),
+                    subtitle: Text(
+                      '${request.category} • ${request.area}\n${date.format(request.requestedFor)}${mine ? ' • Your request' : ''}',
+                    ),
                     isThreeLine: true,
                     trailing: _Status(status: request.status),
                   ),
@@ -60,23 +66,31 @@ class RequestsScreen extends ConsumerWidget {
 class _Status extends StatelessWidget {
   const _Status({required this.status});
   final ApiRequestStatus status;
+
   @override
-  Widget build(BuildContext context) => Chip(label: Text(status.name), visualDensity: VisualDensity.compact);
+  Widget build(BuildContext context) => Chip(
+        label: Text(status.name),
+        visualDensity: VisualDensity.compact,
+      );
 }
 
 class _Error extends StatelessWidget {
   const _Error({required this.error, required this.onRetry});
   final Object error;
   final VoidCallback onRetry;
+
   @override
   Widget build(BuildContext context) => Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Text('$error', textAlign: TextAlign.center),
-            const SizedBox(height: 12),
-            FilledButton(onPressed: onRetry, child: const Text('Retry')),
-          ]),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('$error', textAlign: TextAlign.center),
+              const SizedBox(height: 12),
+              FilledButton(onPressed: onRetry, child: const Text('Retry')),
+            ],
+          ),
         ),
       );
 }

@@ -219,7 +219,7 @@ class _ProposalCard extends ConsumerWidget {
           const SizedBox(height: 12),
           summary.when(
             loading: () => const LinearProgressIndicator(),
-            error: (_, __) => const Text('Vote summary unavailable'),
+            error: (_, _) => const Text('Vote summary unavailable'),
             data: (value) => Text('Accept ${value.acceptCount} • Reject ${value.rejectCount} • Maybe ${value.maybeCount} • Quantity ${value.acceptedQuantity}'),
           ),
           if (proposal.status == ApiProposalStatus.voting) ...[
