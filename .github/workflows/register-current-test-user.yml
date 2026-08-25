@@ -1,0 +1,46 @@
+name: Register Current Phone Test User
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  register:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Register test user
+        env:
+          BASE_URL: https://oriental-bluetooth-areas-tourism.trycloudflare.com
+          PHONE: "+919017407474"
+        run: |
+          set -euo pipefail
+          echo "Checking backend..."
+          curl -fsS "$BASE_URL/health"
+          echo
+          echo "Requesting OTP..."
+          RESPONSE=$(curl -sS -w '\n%{http_code}' -X POST "$BASE_URL/auth/otp/request" \
+            -H 'Content-Type: application/json' \
+            --data "{\"phone\":\"$PHONE\"}")
+          BODY=$(printf '%s' "$RESPONSE" | sed '$d')
+          CODE=$(printf '%s' "$RESPONSE" | tail -n1)
+          echo "OTP request HTTP $CODE"
+          echo "$BODY"
+          test "$CODE" = "201"
+          CHALLENGE=$(echo "$BODY" | jq -r '.challenge_id')
+          OTP=$(echo "$BODY" | jq -r '.development_otp')
+          test -n "$CHALLENGE"
+          test "$CHALLENGE" != "null"
+          test -n "$OTP"
+          test "$OTP" != "null"
+          echo "Verifying OTP..."
+          VERIFY=$(curl -sS -w '\n%{http_code}' -X POST "$BASE_URL/auth/otp/verify" \
+            -H 'Content-Type: application/json' \
+            --data "{\"challenge_id\":\"$CHALLENGE\",\"otp\":\"$OTP\",\"device_id\":\"github-test-registration\"}")
+          VBODY=$(printf '%s' "$VERIFY" | sed '$d')
+          VCODE=$(printf '%s' "$VERIFY" | tail -n1)
+          echo "OTP verify HTTP $VCODE"
+          echo "$VBODY" | jq '{user: .user}'
+          test "$VCODE" = "200"
+          echo "REGISTERED_PHONE=$PHONE"
