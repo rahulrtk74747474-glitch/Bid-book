@@ -1,0 +1,84 @@
+name: Mobile release artifacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: Production HTTPS Bid&Book API base URL
+        required: true
+        type: string
+      razorpay_key_id:
+        description: Razorpay public key ID used by the mobile checkout
+        required: false
+        type: string
+
+jobs:
+  android-qa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Validate production URL
+        run: |
+          case "${{ inputs.api_url }}" in
+            https://*) ;;
+            *) echo "api_url must use HTTPS" >&2; exit 2;;
+          esac
+      - name: Generate native wrappers
+        run: |
+          flutter create . --platforms=android,ios --org com.bidbook --project-name bid_book
+          python3 tools/configure_mobile_native.py
+          flutter pub get
+      - name: Analyze and test
+        run: |
+          flutter analyze
+          flutter test
+      - name: Build Android APK and AAB
+        run: |
+          flutter build apk --release \
+            --dart-define=BIDBOOK_API_BASE_URL=${{ inputs.api_url }} \
+            --dart-define=BIDBOOK_RAZORPAY_KEY_ID=${{ inputs.razorpay_key_id }}
+          flutter build appbundle --release \
+            --dart-define=BIDBOOK_API_BASE_URL=${{ inputs.api_url }} \
+            --dart-define=BIDBOOK_RAZORPAY_KEY_ID=${{ inputs.razorpay_key_id }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bidbook-android-qa
+          path: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+
+  ios-qa:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Validate production URL
+        run: |
+          case "${{ inputs.api_url }}" in
+            https://*) ;;
+            *) echo "api_url must use HTTPS" >&2; exit 2;;
+          esac
+      - name: Generate native wrappers
+        run: |
+          flutter create . --platforms=android,ios --org com.bidbook --project-name bid_book
+          python3 tools/configure_mobile_native.py
+          flutter pub get
+      - name: Build unsigned iOS QA app
+        run: |
+          flutter build ios --release --no-codesign \
+            --dart-define=BIDBOOK_API_BASE_URL=${{ inputs.api_url }} \
+            --dart-define=BIDBOOK_RAZORPAY_KEY_ID=${{ inputs.razorpay_key_id }}
+          ditto -c -k --sequesterRsrc --keepParent build/ios/iphoneos/Runner.app bidbook-ios-unsigned.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bidbook-ios-unsigned-qa
+          path: bidbook-ios-unsigned.zip
+          if-no-files-found: error
