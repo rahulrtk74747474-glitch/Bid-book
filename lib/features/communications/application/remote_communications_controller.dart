@@ -1,6 +1,6 @@
 import 'package:bid_book/core/api/api_exception.dart';
-import 'package:bid_book/core/api/bidbook_api.dart';
 import 'package:bid_book/features/auth/application/remote_auth_controller.dart';
+import 'package:bid_book/features/communications/data/communications_api.dart';
 import 'package:bid_book/features/communications/domain/communication_models.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -12,7 +12,7 @@ final remoteChatMessagesProvider =
     FutureProvider.family<List<ApiChatMessage>, String>((ref, chatId) async {
   final auth = ref.watch(remoteAuthControllerProvider).asData?.value;
   if (auth?.isAuthenticated != true) return const [];
-  return ref.read(bidBookApiProvider).chatMessages(chatId);
+  return ref.read(communicationsApiProvider).chatMessages(chatId);
 });
 
 class RemoteCommunicationsState {
@@ -43,7 +43,7 @@ class RemoteCommunicationsState {
 
 class RemoteCommunicationsController
     extends AsyncNotifier<RemoteCommunicationsState> {
-  BidBookApi get _api => ref.read(bidBookApiProvider);
+  CommunicationsApi get _api => ref.read(communicationsApiProvider);
 
   @override
   Future<RemoteCommunicationsState> build() async {
