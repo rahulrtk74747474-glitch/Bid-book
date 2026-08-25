@@ -49,6 +49,7 @@ class UserOut(Model):
     display_name: str | None
     phone_verified: bool
     identity_verified: bool
+    is_admin: bool
 
 
 class AuthResult(TokenPair):
