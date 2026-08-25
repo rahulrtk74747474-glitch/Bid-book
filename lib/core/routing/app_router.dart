@@ -15,6 +15,8 @@ import 'package:bid_book/features/requests/presentation/post_request_screen.dart
 import 'package:bid_book/features/requests/presentation/requests_screen.dart';
 import 'package:bid_book/features/services/presentation/add_service_listing_screen.dart';
 import 'package:bid_book/features/services/presentation/service_detail_screen.dart';
+import 'package:bid_book/features/trust/presentation/booking_trust_screen.dart';
+import 'package:bid_book/features/trust/presentation/trust_center_screen.dart';
 import 'package:bid_book/shared/widgets/app_shell.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -117,6 +119,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const NotificationsScreen(),
       ),
       GoRoute(
+        path: '/trust',
+        builder: (context, state) => const TrustCenterScreen(),
+      ),
+      GoRoute(
         path: '/groups/:groupId',
         builder: (context, state) => GroupDetailScreen(
           groupId: state.pathParameters['groupId']!,
@@ -143,6 +149,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/bookings/:bookingId',
         builder: (context, state) => BookingDetailScreen(
+          bookingId: state.pathParameters['bookingId']!,
+        ),
+      ),
+      GoRoute(
+        path: '/bookings/:bookingId/trust',
+        builder: (context, state) => BookingTrustScreen(
           bookingId: state.pathParameters['bookingId']!,
         ),
       ),
