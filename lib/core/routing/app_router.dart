@@ -3,6 +3,9 @@ import 'package:bid_book/features/auth/presentation/otp_login_screen.dart';
 import 'package:bid_book/features/bidding/presentation/bid_history_screen.dart';
 import 'package:bid_book/features/bookings/presentation/booking_detail_screen.dart';
 import 'package:bid_book/features/bookings/presentation/bookings_screen.dart';
+import 'package:bid_book/features/communications/presentation/chat_screen.dart';
+import 'package:bid_book/features/communications/presentation/chats_screen.dart';
+import 'package:bid_book/features/communications/presentation/notifications_screen.dart';
 import 'package:bid_book/features/groups/presentation/group_detail_screen.dart';
 import 'package:bid_book/features/groups/presentation/groups_screen.dart';
 import 'package:bid_book/features/home/presentation/home_screen.dart';
@@ -86,12 +89,32 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
+                path: '/chats',
+                builder: (context, state) => const ChatsScreen(),
+                routes: [
+                  GoRoute(
+                    path: ':chatId',
+                    builder: (context, state) => ChatScreen(
+                      chatId: state.pathParameters['chatId']!,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
                 path: '/account',
                 builder: (context, state) => const ProfileScreen(),
               ),
             ],
           ),
         ],
+      ),
+      GoRoute(
+        path: '/notifications',
+        builder: (context, state) => const NotificationsScreen(),
       ),
       GoRoute(
         path: '/groups/:groupId',

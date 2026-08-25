@@ -7,6 +7,7 @@ from sqlalchemy import or_, select
 
 from ..deps import CurrentProvider, CurrentUser, Db
 from ..models import AuditLog, BidEvent, Booking, BookingStatus, ProviderProfile, RequestStatus, ServiceListing, ServiceRequest
+from ..notifications import notify_user
 from ..schemas import BidCreate, BidOut, BookingOut, DirectBookingCreate, ProviderOut, ProviderUpsert, RequestCreate, RequestOut, ServiceCreate, ServiceOut
 
 router = APIRouter(tags=["marketplace"])
@@ -84,6 +85,15 @@ async def direct_book(listing_id: UUID, payload: DirectBookingCreate, db: Db, us
     db.add(booking)
     await db.flush()
     db.add(AuditLog(actor_user_id=user.id, action="booking.direct_created", entity_type="booking", entity_id=str(booking.id)))
+    await notify_user(
+        db,
+        user_id=provider.user_id,
+        kind="booking_created",
+        title="New booking",
+        body=f"{user.display_name or user.phone} booked {listing.title}.",
+        entity_type="booking",
+        entity_id=str(booking.id),
+    )
     await db.commit()
     await db.refresh(booking)
     return BookingOut.model_validate(booking)
@@ -144,6 +154,16 @@ async def submit_bid(
     db.add(bid)
     await db.flush()
     db.add(AuditLog(actor_user_id=user.id, action="bid.appended", entity_type="bid_event", entity_id=str(bid.id)))
+    revision = "revised" if previous else "new"
+    await notify_user(
+        db,
+        user_id=request.created_by_user_id,
+        kind="bid_received",
+        title="Bid received",
+        body=f"{provider.display_name} submitted a {revision} bid of ₹{payload.amount_paise / 100:.2f} for {request.title}.",
+        entity_type="service_request",
+        entity_id=str(request.id),
+    )
     await db.commit()
     await db.refresh(bid)
     return BidOut.model_validate(bid).model_copy(update={"is_current_offer": True})
@@ -191,6 +211,9 @@ async def award_bid(request_id: UUID, bid_id: UUID, db: Db, user: CurrentUser) -
     if latest.id != bid.id:
         raise HTTPException(status_code=409, detail="Historical bids cannot be awarded; select the provider's latest offer")
 
+    provider = await db.get(ProviderProfile, bid.provider_id)
+    if provider is None:
+        raise HTTPException(status_code=409, detail="Provider is unavailable")
     booking = Booking(
         customer_user_id=user.id,
         provider_id=bid.provider_id,
@@ -207,6 +230,15 @@ async def award_bid(request_id: UUID, bid_id: UUID, db: Db, user: CurrentUser) -
     request.accepted_bid_event_id = bid.id
     request.booking_id = booking.id
     db.add(AuditLog(actor_user_id=user.id, action="request.bid_awarded", entity_type="booking", entity_id=str(booking.id), detail=f"bid_event_id={bid.id}"))
+    await notify_user(
+        db,
+        user_id=provider.user_id,
+        kind="bid_accepted",
+        title="Your bid was accepted",
+        body=f"Your ₹{bid.amount_paise / 100:.2f} bid for {request.title} was accepted.",
+        entity_type="booking",
+        entity_id=str(booking.id),
+    )
     await db.commit()
     await db.refresh(booking)
     return BookingOut.model_validate(booking)
