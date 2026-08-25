@@ -63,8 +63,12 @@ async def request_otp(payload: OtpRequest, db: Db) -> OtpRequestResult:
     await db.flush()
     otp = generate_otp()
     challenge.code_digest = otp_digest(challenge_id=challenge.id, phone=phone, otp=otp)
+    try:
+        await sms_sender.send_otp(phone, otp)
+    except RuntimeError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     await db.commit()
-    await sms_sender.send_otp(phone, otp)
 
     development_otp = None
     if settings.environment != "production" and settings.expose_development_otp:
