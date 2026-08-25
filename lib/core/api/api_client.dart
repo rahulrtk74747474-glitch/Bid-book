@@ -51,6 +51,13 @@ class ApiClient {
   }) =>
       _send('PUT', path, data: data, authenticated: authenticated);
 
+  Future<dynamic> delete(
+    String path, {
+    Object? data,
+    bool authenticated = true,
+  }) =>
+      _send('DELETE', path, data: data, authenticated: authenticated);
+
   Future<dynamic> _send(
     String method,
     String path, {
