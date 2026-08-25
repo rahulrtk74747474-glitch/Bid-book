@@ -73,6 +73,13 @@ class ProfileScreen extends ConsumerWidget {
             onTap: () => context.push('/discover'),
           ),
           ListTile(
+            leading: const Icon(Icons.near_me_outlined),
+            title: const Text('Nearby services'),
+            subtitle: const Text('Foreground location search using provider service radius'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/nearby'),
+          ),
+          ListTile(
             leading: const Icon(Icons.handyman_outlined),
             title: Text(
               provider == null ? 'Become a service provider' : provider.displayName,
@@ -87,6 +94,13 @@ class ProfileScreen extends ConsumerWidget {
           ),
           if (provider != null) ...[
             ListTile(
+              leading: const Icon(Icons.badge_outlined),
+              title: const Text('Business & professional profile'),
+              subtitle: const Text('Skills, languages, experience, GSTIN, service radius and location'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/provider/business'),
+            ),
+            ListTile(
               leading: const Icon(Icons.add_business_outlined),
               title: const Text('Publish a service'),
               trailing: const Icon(Icons.chevron_right),
@@ -98,6 +112,13 @@ class ProfileScreen extends ConsumerWidget {
               subtitle: const Text('Set the days you normally accept work'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push('/provider/availability'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.groups_outlined),
+              title: const Text('Company team'),
+              subtitle: const Text('Managers, dispatchers, technicians and accountants'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/provider/team'),
             ),
           ],
           ListTile(
@@ -122,11 +143,18 @@ class ProfileScreen extends ConsumerWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push('/support-safety'),
           ),
+          ListTile(
+            leading: const Icon(Icons.privacy_tip_outlined),
+            title: const Text('Privacy, data & notifications'),
+            subtitle: const Text('Push setup, data export and device privacy'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/privacy-data'),
+          ),
           if (operations?.isAdmin == true)
             ListTile(
               leading: const Icon(Icons.admin_panel_settings_outlined),
               title: const Text('Admin operations'),
-              subtitle: const Text('Review trust, safety, payout and support queues'),
+              subtitle: const Text('MFA-protected trust, safety, payout and support queues'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push('/admin'),
             ),
