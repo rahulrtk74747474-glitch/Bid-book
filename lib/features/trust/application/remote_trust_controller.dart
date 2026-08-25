@@ -106,8 +106,11 @@ class RemoteTrustController extends AsyncNotifier<RemoteTrustState> {
     await refreshAll();
   }
 
-  Future<void> startBooking(String bookingId) async {
-    await _api.startBooking(bookingId);
+  Future<void> startBooking({
+    required String bookingId,
+    required String code,
+  }) async {
+    await _api.startBooking(bookingId: bookingId, code: code);
     ref.invalidate(bookingTrustProvider(bookingId));
     await ref.read(remoteMarketplaceProvider.notifier).refreshAll();
   }

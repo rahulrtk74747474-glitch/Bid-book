@@ -47,8 +47,14 @@ class TrustApi {
         '/trust/payments/$paymentId/simulate-capture',
       )));
 
-  Future<String> startBooking(String bookingId) async {
-    final data = _map(await _client.post('/trust/bookings/$bookingId/start'));
+  Future<String> startBooking({
+    required String bookingId,
+    required String code,
+  }) async {
+    final data = _map(await _client.post(
+      '/ops/bookings/$bookingId/start',
+      data: {'code': code},
+    ));
     return data['status'] as String? ?? 'in_progress';
   }
 

@@ -31,6 +31,13 @@ async def request_otp(payload: OtpRequest, db: Db) -> OtpRequestResult:
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
 
+    existing_user = await db.execute(select(User).where(User.phone == phone))
+    account = existing_user.scalar_one_or_none()
+    if account is not None and (not account.is_active or account.deleted_at is not None):
+        raise HTTPException(status_code=403, detail="Account unavailable")
+    if account is not None and account.suspended_at is not None:
+        raise HTTPException(status_code=403, detail="Account suspended")
+
     now = utcnow()
     cooldown_since = now - timedelta(seconds=settings.otp_cooldown_seconds)
     latest = await db.execute(
@@ -97,10 +104,18 @@ async def verify_otp(payload: OtpVerify, db: Db, user_agent: str | None = Header
     challenge.consumed_at = now
     result = await db.execute(select(User).where(User.phone == challenge.phone))
     user = result.scalar_one_or_none()
+    should_be_admin = challenge.phone in settings.admin_phones
     if user is None:
-        user = User(phone=challenge.phone)
+        user = User(phone=challenge.phone, is_admin=should_be_admin)
         db.add(user)
         await db.flush()
+    else:
+        if not user.is_active or user.deleted_at is not None:
+            raise HTTPException(status_code=403, detail="Account unavailable")
+        if user.suspended_at is not None:
+            raise HTTPException(status_code=403, detail="Account suspended")
+        if should_be_admin and not user.is_admin:
+            user.is_admin = True
 
     refresh_token = new_refresh_token()
     session = Session(
@@ -127,6 +142,11 @@ async def refresh(payload: RefreshRequest, db: Db) -> TokenPair:
     session = result.scalar_one_or_none()
     if session is None or session.revoked_at is not None or session.expires_at <= now:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
+    user = await db.get(User, session.user_id)
+    if user is None or not user.is_active or user.deleted_at is not None or user.suspended_at is not None:
+        session.revoked_at = now
+        await db.commit()
+        raise HTTPException(status_code=401, detail="Account unavailable")
 
     refresh_token = new_refresh_token()
     session.refresh_hash = refresh_token_hash(refresh_token)

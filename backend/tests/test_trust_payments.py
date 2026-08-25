@@ -93,7 +93,13 @@ def test_payment_completion_payout_reviews_and_identity() -> None:
         assert captured.status_code == 200, captured.text
         assert captured.json()["status"] == "captured"
 
-        started = client.post(f"/v1/trust/bookings/{booking_id}/start", headers=auth(provider_user))
+        code = client.post(f"/v1/ops/bookings/{booking_id}/start-code", headers=auth(customer))
+        assert code.status_code == 200, code.text
+        started = client.post(
+            f"/v1/ops/bookings/{booking_id}/start",
+            headers=auth(provider_user),
+            json={"code": code.json()["code"]},
+        )
         assert started.status_code == 200, started.text
         assert started.json()["status"] == "in_progress"
 

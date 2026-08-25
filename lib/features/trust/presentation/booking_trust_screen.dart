@@ -1,3 +1,6 @@
+import 'package:bid_book/features/auth/application/remote_auth_controller.dart';
+import 'package:bid_book/features/marketplace/application/remote_marketplace_controller.dart';
+import 'package:bid_book/features/operations/application/remote_operations_controller.dart';
 import 'package:bid_book/features/trust/application/remote_trust_controller.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -11,6 +14,12 @@ class BookingTrustScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final trust = ref.watch(bookingTrustProvider(bookingId));
+    final auth = ref.watch(remoteAuthControllerProvider).asData?.value;
+    final marketplace = ref.watch(remoteMarketplaceProvider).asData?.value;
+    final booking = marketplace?.bookings
+        .where((item) => item.id == bookingId)
+        .firstOrNull;
+    final isCustomer = booking?.customerUserId == auth?.user?.id;
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹');
     return Scaffold(
       appBar: AppBar(title: const Text('Payment & trust')),
@@ -110,7 +119,7 @@ class BookingTrustScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Job & payout',
+                        'Secure job handoff & payout',
                         style: Theme.of(context)
                             .textTheme
                             .titleLarge
@@ -126,18 +135,20 @@ class BookingTrustScreen extends ConsumerWidget {
                           _row('Hold reason', data.payout!.holdReason!),
                       ],
                       const SizedBox(height: 12),
+                      if (isCustomer &&
+                          booking?.status.name == 'confirmed' &&
+                          ['captured', 'partially_refunded']
+                              .contains(data.payment?.status))
+                        FilledButton.tonalIcon(
+                          onPressed: () => _generateStartCode(context, ref),
+                          icon: const Icon(Icons.pin_outlined),
+                          label: const Text('Generate provider start code'),
+                        ),
                       if (data.canStart)
                         FilledButton.icon(
-                          onPressed: () => _run(
-                            context,
-                            ref,
-                            () => ref
-                                .read(remoteTrustProvider.notifier)
-                                .startBooking(bookingId),
-                            'Job marked in progress.',
-                          ),
+                          onPressed: () => _startWithCode(context, ref),
                           icon: const Icon(Icons.play_circle_outline),
-                          label: const Text('Start job'),
+                          label: const Text('Start job with customer code'),
                         ),
                       if (data.canComplete)
                         FilledButton.icon(
@@ -152,6 +163,10 @@ class BookingTrustScreen extends ConsumerWidget {
                           icon: const Icon(Icons.task_alt),
                           label: const Text('Confirm completion'),
                         ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'A provider cannot start a confirmed paid job until the customer shares a short-lived six-digit code.',
+                      ),
                     ],
                   ),
                 ),
@@ -164,7 +179,7 @@ class BookingTrustScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Reviews & disputes',
+                        'Reviews, warranty & disputes',
                         style: Theme.of(context)
                             .textTheme
                             .titleLarge
@@ -182,6 +197,12 @@ class BookingTrustScreen extends ConsumerWidget {
                               onPressed: () => _reviewDialog(context, ref),
                               icon: const Icon(Icons.star_outline),
                               label: const Text('Write review'),
+                            ),
+                          if (isCustomer && booking?.status.name == 'completed')
+                            OutlinedButton.icon(
+                              onPressed: () => _warrantyDialog(context, ref),
+                              icon: const Icon(Icons.workspace_premium_outlined),
+                              label: const Text('Warranty claim'),
                             ),
                           OutlinedButton.icon(
                             onPressed: () => _disputeDialog(context, ref),
@@ -208,6 +229,102 @@ class BookingTrustScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _generateStartCode(BuildContext context, WidgetRef ref) async {
+    try {
+      final result = await ref
+          .read(remoteOperationsProvider.notifier)
+          .createStartCode(bookingId);
+      if (!context.mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Provider start code'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SelectableText(
+                result.code,
+                style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, letterSpacing: 6),
+              ),
+              const SizedBox(height: 12),
+              Text('Expires ${DateFormat('h:mm a').format(result.expiresAt)}. Share it only when the assigned provider is ready to start the job.'),
+            ],
+          ),
+          actions: [
+            FilledButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Done')),
+          ],
+        ),
+      );
+    } catch (error) {
+      if (context.mounted) _showOpsError(context, ref, error);
+    }
+  }
+
+  Future<void> _startWithCode(BuildContext context, WidgetRef ref) async {
+    final code = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Enter customer start code'),
+        content: TextField(
+          controller: code,
+          keyboardType: TextInputType.number,
+          maxLength: 6,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: '6-digit code'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Start job')),
+        ],
+      ),
+    );
+    if (confirmed == true && code.text.trim().length == 6 && context.mounted) {
+      await _run(
+        context,
+        ref,
+        () => ref.read(remoteTrustProvider.notifier).startBooking(
+              bookingId: bookingId,
+              code: code.text.trim(),
+            ),
+        'Start code verified. Job is in progress.',
+      );
+    }
+    code.dispose();
+  }
+
+  Future<void> _warrantyDialog(BuildContext context, WidgetRef ref) async {
+    final issue = TextEditingController();
+    final submitted = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Open warranty claim'),
+        content: TextField(
+          controller: issue,
+          maxLines: 5,
+          maxLength: 4000,
+          decoration: const InputDecoration(labelText: 'What problem returned or remains?'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Submit')),
+        ],
+      ),
+    );
+    if (submitted == true && issue.text.trim().length >= 5 && context.mounted) {
+      try {
+        await ref.read(remoteOperationsProvider.notifier).createWarrantyClaim(
+              bookingId: bookingId,
+              issue: issue.text.trim(),
+            );
+        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Warranty claim opened.')));
+      } catch (error) {
+        if (context.mounted) _showOpsError(context, ref, error);
+      }
+    }
+    issue.dispose();
   }
 
   Future<void> _reviewDialog(BuildContext context, WidgetRef ref) async {
@@ -373,6 +490,11 @@ class BookingTrustScreen extends ConsumerWidget {
 
   void _showError(BuildContext context, WidgetRef ref, Object error) {
     final message = ref.read(remoteTrustProvider.notifier).friendlyError(error);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _showOpsError(BuildContext context, WidgetRef ref, Object error) {
+    final message = ref.read(remoteOperationsProvider.notifier).friendlyError(error);
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 

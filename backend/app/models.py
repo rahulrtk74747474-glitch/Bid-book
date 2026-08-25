@@ -63,7 +63,11 @@ class User(Base):
     display_name: Mapped[str | None] = mapped_column(String(120))
     phone_verified: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     identity_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    suspended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    suspension_reason: Mapped[str | None] = mapped_column(String(500))
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
