@@ -37,7 +37,7 @@ class BookingDetailScreen extends ConsumerWidget {
           const Icon(Icons.verified_outlined, size: 64),
           const SizedBox(height: 12),
           Text(
-            'Booking confirmed',
+            'Booking ${value.status.name}',
             textAlign: TextAlign.center,
             style: Theme.of(context)
                 .textTheme
@@ -55,6 +55,12 @@ class BookingDetailScreen extends ConsumerWidget {
           if (value.requestId != null) _row('Request', value.requestId!),
           const SizedBox(height: 16),
           FilledButton.icon(
+            onPressed: () => context.push('/bookings/${value.id}/trust'),
+            icon: const Icon(Icons.shield_outlined),
+            label: const Text('Payment, trust, review & dispute'),
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
             onPressed: () async {
               try {
                 final chat = await ref
@@ -80,7 +86,7 @@ class BookingDetailScreen extends ConsumerWidget {
             child: Padding(
               padding: EdgeInsets.all(14),
               child: Text(
-                'Keep job coordination inside Bid&Book. The agreed amount is a server-side snapshot, so later bid changes cannot alter this booking price.',
+                'Keep job coordination and payment state inside Bid&Book. The agreed amount is a server-side snapshot, so later bid changes cannot alter this booking price.',
               ),
             ),
           ),
