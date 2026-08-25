@@ -10,11 +10,36 @@ from ..models import Booking, BookingStatus, ProviderProfile
 from ..notifications import notify_user
 from ..ops_models import BookingStartCode
 from ..ops_schemas import StartCodeVerify
+from ..production_models import BookingAssignment, ProviderStaff
 from ..security import utcnow
 from ..start_code import verify_start_code
 from ..trust_models import Payment, PaymentStatus
 
 router = APIRouter(prefix="/ops/bookings", tags=["secure-booking"])
+
+
+async def _can_start_booking(db: Db, booking: Booking, user_id: UUID) -> bool:
+    provider = await db.get(ProviderProfile, booking.provider_id)
+    if provider is not None and provider.user_id == user_id:
+        return True
+    assignment_result = await db.execute(
+        select(BookingAssignment).where(
+            BookingAssignment.booking_id == booking.id,
+            BookingAssignment.staff_user_id == user_id,
+        )
+    )
+    assignment = assignment_result.scalar_one_or_none()
+    if assignment is None:
+        return False
+    staff_result = await db.execute(
+        select(ProviderStaff.id).where(
+            ProviderStaff.provider_id == booking.provider_id,
+            ProviderStaff.user_id == user_id,
+            ProviderStaff.active.is_(True),
+            ProviderStaff.role.in_(["owner", "manager", "technician"]),
+        )
+    )
+    return staff_result.scalar_one_or_none() is not None
 
 
 @router.post("/{booking_id}/start", response_model=dict[str, str])
@@ -28,9 +53,8 @@ async def start_booking_with_code(
     booking = booking_result.scalar_one_or_none()
     if booking is None:
         raise HTTPException(status_code=404, detail="Booking not found")
-    provider = await db.get(ProviderProfile, booking.provider_id)
-    if provider is None or provider.user_id != user.id:
-        raise HTTPException(status_code=403, detail="Only the assigned provider can start this booking")
+    if not await _can_start_booking(db, booking, user.id):
+        raise HTTPException(status_code=403, detail="Only the provider or assigned technician can start this booking")
     if booking.status != BookingStatus.confirmed:
         raise HTTPException(status_code=409, detail="Booking cannot be started in its current state")
 
