@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 
 from ..deps import CurrentUser, Db
 from ..models import AuditLog, Group, GroupMember, GroupProposal, GroupRole, GroupVote, ProposalStatus, ServiceRequest, VoteChoice
+from ..notifications import notify_many, notify_user
 from ..schemas import GroupCreate, GroupJoin, GroupOut, MemberOut, ProposalCreate, ProposalOut, ProposalSummary, RequestOut, VoteOut, VoteUpsert
 
 router = APIRouter(prefix="/groups", tags=["groups"])
@@ -36,6 +37,11 @@ async def _require_admin(db: Db, group_id: UUID, user_id: UUID) -> GroupMember:
     if member.role not in {GroupRole.owner, GroupRole.admin}:
         raise HTTPException(status_code=403, detail="Group admin permission required")
     return member
+
+
+async def _member_ids(db: Db, group_id: UUID) -> list[UUID]:
+    result = await db.execute(select(GroupMember.user_id).where(GroupMember.group_id == group_id))
+    return list(result.scalars().all())
 
 
 @router.post("", response_model=GroupOut, status_code=201)
@@ -77,6 +83,16 @@ async def join_group(payload: GroupJoin, db: Db, user: CurrentUser) -> MemberOut
         return MemberOut.model_validate(existing)
     member = GroupMember(group_id=group.id, user_id=user.id, role=GroupRole.member)
     db.add(member)
+    await db.flush()
+    await notify_user(
+        db,
+        user_id=group.owner_user_id,
+        kind="group_member_joined",
+        title="New group member",
+        body=f"{user.display_name or user.phone} joined {group.name}.",
+        entity_type="group",
+        entity_id=str(group.id),
+    )
     await db.commit()
     await db.refresh(member)
     return MemberOut.model_validate(member)
@@ -85,8 +101,22 @@ async def join_group(payload: GroupJoin, db: Db, user: CurrentUser) -> MemberOut
 @router.post("/{group_id}/proposals", response_model=ProposalOut, status_code=201)
 async def create_proposal(group_id: UUID, payload: ProposalCreate, db: Db, user: CurrentUser) -> ProposalOut:
     await _require_admin(db, group_id, user.id)
+    group = await db.get(Group, group_id)
+    if group is None:
+        raise HTTPException(status_code=404, detail="Group not found")
     proposal = GroupProposal(group_id=group_id, created_by_user_id=user.id, **payload.model_dump())
     db.add(proposal)
+    await db.flush()
+    await notify_many(
+        db,
+        user_ids=await _member_ids(db, group_id),
+        exclude_user_id=user.id,
+        kind="group_proposal",
+        title=f"New proposal in {group.name}",
+        body=f"Vote on {proposal.title} and enter your quantity.",
+        entity_type="group_proposal",
+        entity_id=str(proposal.id),
+    )
     await db.commit()
     await db.refresh(proposal)
     return ProposalOut.model_validate(proposal)
@@ -193,6 +223,16 @@ async def publish_proposal(group_id: UUID, proposal_id: UUID, db: Db, user: Curr
             entity_id=str(request.id),
             detail=f"proposal_id={proposal.id};accepted_quantity={int(accepted_quantity)}",
         )
+    )
+    await notify_many(
+        db,
+        user_ids=await _member_ids(db, group_id),
+        exclude_user_id=user.id,
+        kind="group_published",
+        title=f"{group.name} request published",
+        body=f"{proposal.title} is now open for provider bidding. Accepted quantity: {int(accepted_quantity)}.",
+        entity_type="service_request",
+        entity_id=str(request.id),
     )
     await db.commit()
     await db.refresh(request)
