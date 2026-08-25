@@ -1,10 +1,12 @@
 import 'package:bid_book/features/auth/application/remote_auth_controller.dart';
 import 'package:bid_book/features/marketplace/application/remote_marketplace_controller.dart';
 import 'package:bid_book/features/operations/application/remote_operations_controller.dart';
+import 'package:bid_book/features/production/application/payment_checkout.dart';
 import 'package:bid_book/features/trust/application/remote_trust_controller.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 class BookingTrustScreen extends ConsumerWidget {
@@ -16,11 +18,10 @@ class BookingTrustScreen extends ConsumerWidget {
     final trust = ref.watch(bookingTrustProvider(bookingId));
     final auth = ref.watch(remoteAuthControllerProvider).asData?.value;
     final marketplace = ref.watch(remoteMarketplaceProvider).asData?.value;
-    final booking = marketplace?.bookings
-        .where((item) => item.id == bookingId)
-        .firstOrNull;
+    final booking = marketplace?.bookings.where((item) => item.id == bookingId).firstOrNull;
     final isCustomer = booking?.customerUserId == auth?.user?.id;
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹');
+
     return Scaffold(
       appBar: AppBar(title: const Text('Payment & trust')),
       body: trust.when(
@@ -42,185 +43,171 @@ class BookingTrustScreen extends ConsumerWidget {
           ),
         ),
         data: (data) => RefreshIndicator(
-          onRefresh: () async {
-            ref.invalidate(bookingTrustProvider(bookingId));
-            await ref.read(bookingTrustProvider(bookingId).future);
-          },
+          onRefresh: () => _refresh(ref),
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
             children: [
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Booking payment',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(fontWeight: FontWeight.w800),
+              _section(
+                context,
+                title: 'Booking payment',
+                children: [
+                  if (data.payment == null)
+                    const Text('No payment intent has been created yet.')
+                  else ...[
+                    _row('Amount', currency.format(data.payment!.amountRupees)),
+                    if (data.payment!.platformFeePaise > 0)
+                      _row('Platform fee', currency.format(data.payment!.platformFeePaise / 100)),
+                    _row('Status', data.payment!.status),
+                    _row('Gateway', data.payment!.gateway),
+                    if (data.payment!.refundedPaise > 0)
+                      _row('Refunded', currency.format(data.payment!.refundedRupees)),
+                  ],
+                  if (data.canPay) ...[
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      onPressed: () => _run(
+                        context,
+                        ref,
+                        () => ref.read(remoteTrustProvider.notifier).createPayment(bookingId),
+                        'Secure payment order created.',
                       ),
-                      const SizedBox(height: 10),
-                      if (data.payment == null)
-                        const Text('No payment intent has been created yet.')
-                      else ...[
-                        _row('Amount', currency.format(data.payment!.amountRupees)),
-                        _row('Status', data.payment!.status),
-                        _row('Gateway', data.payment!.gateway),
-                        if (data.payment!.refundedPaise > 0)
-                          _row(
-                            'Refunded',
-                            currency.format(data.payment!.refundedRupees),
-                          ),
-                      ],
-                      if (data.canPay) ...[
-                        const SizedBox(height: 12),
-                        FilledButton.icon(
-                          onPressed: () => _run(
-                            context,
-                            ref,
-                            () => ref
-                                .read(remoteTrustProvider.notifier)
-                                .createPayment(bookingId),
-                            'Payment intent created.',
-                          ),
-                          icon: const Icon(Icons.payments_outlined),
-                          label: const Text('Create payment'),
-                        ),
-                      ],
-                      if (kDebugMode &&
-                          data.payment?.status == 'created' &&
-                          data.payment?.gateway == 'development') ...[
-                        const SizedBox(height: 10),
-                        FilledButton.tonalIcon(
-                          onPressed: () => _run(
-                            context,
-                            ref,
-                            () => ref
-                                .read(remoteTrustProvider.notifier)
-                                .simulateCapture(bookingId, data.payment!.id),
-                            'Development payment captured.',
-                          ),
-                          icon: const Icon(Icons.developer_mode),
-                          label: const Text('Simulate payment capture'),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
+                      icon: const Icon(Icons.payments_outlined),
+                      label: const Text('Create secure payment'),
+                    ),
+                  ],
+                  if (data.payment?.gateway == 'razorpay' && data.payment?.status == 'created') ...[
+                    const SizedBox(height: 10),
+                    FilledButton.icon(
+                      onPressed: () => _checkout(context, ref, data.payment!),
+                      icon: const Icon(Icons.lock_outline),
+                      label: const Text('Pay securely'),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'The app never marks its own checkout callback as captured. Bid&Book waits for the signed payment-provider webhook.',
+                    ),
+                  ],
+                  if (kDebugMode &&
+                      data.payment?.status == 'created' &&
+                      data.payment?.gateway == 'development') ...[
+                    const SizedBox(height: 10),
+                    FilledButton.tonalIcon(
+                      onPressed: () => _run(
+                        context,
+                        ref,
+                        () => ref
+                            .read(remoteTrustProvider.notifier)
+                            .simulateCapture(bookingId, data.payment!.id),
+                        'Development payment captured.',
+                      ),
+                      icon: const Icon(Icons.developer_mode),
+                      label: const Text('Simulate payment capture'),
+                    ),
+                  ],
+                ],
               ),
               const SizedBox(height: 12),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              _section(
+                context,
+                title: 'Secure job handoff & payout',
+                children: [
+                  if (data.payout == null)
+                    const Text('Payout record appears after payment capture.')
+                  else ...[
+                    _row('Payout', currency.format(data.payout!.amountRupees)),
+                    _row('Payout status', data.payout!.status),
+                    if (data.payout!.holdReason != null)
+                      _row('Hold reason', data.payout!.holdReason!),
+                  ],
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
-                      Text(
-                        'Secure job handoff & payout',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(fontWeight: FontWeight.w800),
-                      ),
-                      const SizedBox(height: 10),
-                      if (data.payout == null)
-                        const Text('Payout record appears after payment capture.')
-                      else ...[
-                        _row('Payout', currency.format(data.payout!.amountRupees)),
-                        _row('Payout status', data.payout!.status),
-                        if (data.payout!.holdReason != null)
-                          _row('Hold reason', data.payout!.holdReason!),
-                      ],
-                      const SizedBox(height: 12),
                       if (isCustomer &&
                           booking?.status.name == 'confirmed' &&
-                          ['captured', 'partially_refunded']
-                              .contains(data.payment?.status))
+                          ['captured', 'partially_refunded'].contains(data.payment?.status))
                         FilledButton.tonalIcon(
                           onPressed: () => _generateStartCode(context, ref),
                           icon: const Icon(Icons.pin_outlined),
-                          label: const Text('Generate provider start code'),
+                          label: const Text('Generate start code'),
                         ),
                       if (data.canStart)
                         FilledButton.icon(
                           onPressed: () => _startWithCode(context, ref),
                           icon: const Icon(Icons.play_circle_outline),
-                          label: const Text('Start job with customer code'),
+                          label: const Text('Start with customer code'),
+                        ),
+                      if (!isCustomer && booking != null)
+                        OutlinedButton.icon(
+                          onPressed: () => context.push('/provider/team?bookingId=$bookingId'),
+                          icon: const Icon(Icons.engineering_outlined),
+                          label: const Text('Assign technician'),
                         ),
                       if (data.canComplete)
                         FilledButton.icon(
                           onPressed: () => _run(
                             context,
                             ref,
-                            () => ref
-                                .read(remoteTrustProvider.notifier)
-                                .completeBooking(bookingId),
+                            () => ref.read(remoteTrustProvider.notifier).completeBooking(bookingId),
                             'Booking completed. Eligible payout can proceed.',
                           ),
                           icon: const Icon(Icons.task_alt),
                           label: const Text('Confirm completion'),
                         ),
-                      const SizedBox(height: 10),
-                      const Text(
-                        'A provider cannot start a confirmed paid job until the customer shares a short-lived six-digit code.',
-                      ),
                     ],
                   ),
-                ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'The provider or explicitly assigned technician must enter the short-lived customer code before work can start.',
+                  ),
+                ],
               ),
               const SizedBox(height: 12),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              _section(
+                context,
+                title: 'Reviews, warranty & disputes',
+                children: [
+                  Text('${data.openDisputeCount} open dispute(s) on this booking.'),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
-                      Text(
-                        'Reviews, warranty & disputes',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(fontWeight: FontWeight.w800),
+                      if (data.canReview)
+                        OutlinedButton.icon(
+                          onPressed: () => _reviewDialog(context, ref),
+                          icon: const Icon(Icons.star_outline),
+                          label: const Text('Write review'),
+                        ),
+                      if (isCustomer && booking?.status.name == 'completed')
+                        OutlinedButton.icon(
+                          onPressed: () => _warrantyDialog(context, ref),
+                          icon: const Icon(Icons.workspace_premium_outlined),
+                          label: const Text('Warranty claim'),
+                        ),
+                      OutlinedButton.icon(
+                        onPressed: () => _disputeDialog(context, ref),
+                        icon: const Icon(Icons.gavel_outlined),
+                        label: const Text('Open dispute'),
                       ),
-                      const SizedBox(height: 8),
-                      Text('${data.openDisputeCount} open dispute(s) on this booking.'),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          if (data.canReview)
-                            OutlinedButton.icon(
-                              onPressed: () => _reviewDialog(context, ref),
-                              icon: const Icon(Icons.star_outline),
-                              label: const Text('Write review'),
-                            ),
-                          if (isCustomer && booking?.status.name == 'completed')
-                            OutlinedButton.icon(
-                              onPressed: () => _warrantyDialog(context, ref),
-                              icon: const Icon(Icons.workspace_premium_outlined),
-                              label: const Text('Warranty claim'),
-                            ),
-                          OutlinedButton.icon(
-                            onPressed: () => _disputeDialog(context, ref),
-                            icon: const Icon(Icons.gavel_outlined),
-                            label: const Text('Open dispute'),
-                          ),
-                        ],
+                      OutlinedButton.icon(
+                        onPressed: () => context.push(
+                          '/media?entityType=booking&entityId=$bookingId',
+                        ),
+                        icon: const Icon(Icons.add_a_photo_outlined),
+                        label: const Text('Job photos/evidence'),
                       ),
                     ],
                   ),
-                ),
+                ],
               ),
               const SizedBox(height: 12),
               const Card(
                 child: Padding(
                   padding: EdgeInsets.all(16),
                   child: Text(
-                    'Payment and payout amounts come from the server-side booking snapshot. A client cannot lower the booking payment or increase the provider payout. Open disputes hold unpaid payouts for review.',
+                    'Amounts come from the server-side booking snapshot. The phone cannot lower the payment, increase a payout, overwrite bid history, or bypass the customer start code.',
                   ),
                 ),
               ),
@@ -231,11 +218,40 @@ class BookingTrustScreen extends ConsumerWidget {
     );
   }
 
+  Future<void> _checkout(BuildContext context, WidgetRef ref, payment) async {
+    final auth = ref.read(remoteAuthControllerProvider).asData?.value;
+    final checkout = PaymentCheckout();
+    try {
+      await checkout.open(
+        payment: payment,
+        customerName: auth?.user?.bestName,
+        customerPhone: auth?.user?.phone,
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Checkout submitted. Confirming payment with the server…')),
+      );
+      for (var attempt = 0; attempt < 6; attempt++) {
+        await Future<void>.delayed(const Duration(seconds: 1));
+        ref.invalidate(bookingTrustProvider(bookingId));
+        final updated = await ref.read(bookingTrustProvider(bookingId).future);
+        if (['captured', 'partially_refunded'].contains(updated.payment?.status)) break;
+      }
+    } catch (error) {
+      if (context.mounted) _showError(context, ref, error);
+    } finally {
+      checkout.dispose();
+    }
+  }
+
+  Future<void> _refresh(WidgetRef ref) async {
+    ref.invalidate(bookingTrustProvider(bookingId));
+    await ref.read(bookingTrustProvider(bookingId).future);
+  }
+
   Future<void> _generateStartCode(BuildContext context, WidgetRef ref) async {
     try {
-      final result = await ref
-          .read(remoteOperationsProvider.notifier)
-          .createStartCode(bookingId);
+      final result = await ref.read(remoteOperationsProvider.notifier).createStartCode(bookingId);
       if (!context.mounted) return;
       await showDialog<void>(
         context: context,
@@ -249,7 +265,9 @@ class BookingTrustScreen extends ConsumerWidget {
                 style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, letterSpacing: 6),
               ),
               const SizedBox(height: 12),
-              Text('Expires ${DateFormat('h:mm a').format(result.expiresAt)}. Share it only when the assigned provider is ready to start the job.'),
+              Text(
+                'Expires ${DateFormat('h:mm a').format(result.expiresAt)}. Share it only when the provider or assigned technician is ready to start.',
+              ),
             ],
           ),
           actions: [
@@ -319,7 +337,11 @@ class BookingTrustScreen extends ConsumerWidget {
               bookingId: bookingId,
               issue: issue.text.trim(),
             );
-        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Warranty claim opened.')));
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Warranty claim opened.')),
+          );
+        }
       } catch (error) {
         if (context.mounted) _showOpsError(context, ref, error);
       }
@@ -359,38 +381,29 @@ class BookingTrustScreen extends ConsumerWidget {
             ],
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Submit'),
-            ),
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Submit')),
           ],
         ),
       ),
     );
-    if (submitted != true || !context.mounted) {
-      comment.dispose();
-      return;
-    }
-    try {
-      await ref.read(remoteTrustProvider.notifier).createReview(
-            bookingId: bookingId,
-            rating: rating,
-            comment: comment.text,
+    if (submitted == true && context.mounted) {
+      try {
+        await ref.read(remoteTrustProvider.notifier).createReview(
+              bookingId: bookingId,
+              rating: rating,
+              comment: comment.text,
+            );
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Review submitted.')),
           );
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Review submitted.')),
-        );
+        }
+      } catch (error) {
+        if (context.mounted) _showError(context, ref, error);
       }
-    } catch (error) {
-      if (context.mounted) _showError(context, ref, error);
-    } finally {
-      comment.dispose();
     }
+    comment.dispose();
   }
 
   Future<void> _disputeDialog(BuildContext context, WidgetRef ref) async {
@@ -405,68 +418,50 @@ class BookingTrustScreen extends ConsumerWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(
-                controller: category,
-                decoration: const InputDecoration(labelText: 'Category'),
-              ),
+              TextField(controller: category, decoration: const InputDecoration(labelText: 'Category')),
               const SizedBox(height: 10),
               TextField(
                 controller: summary,
                 maxLines: 4,
                 maxLength: 4000,
-                decoration: const InputDecoration(
-                  labelText: 'Describe the problem',
-                ),
+                decoration: const InputDecoration(labelText: 'Describe the problem'),
               ),
               const SizedBox(height: 10),
               TextField(
                 controller: refund,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Requested refund ₹ (0 if none)',
-                ),
+                decoration: const InputDecoration(labelText: 'Requested refund ₹ (0 if none)'),
               ),
             ],
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Open dispute'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Open dispute')),
         ],
       ),
     );
-    if (submitted != true || !context.mounted) {
-      category.dispose();
-      summary.dispose();
-      refund.dispose();
-      return;
-    }
-    final rupees = int.tryParse(refund.text.trim()) ?? 0;
-    try {
-      await ref.read(remoteTrustProvider.notifier).openDispute(
-            bookingId: bookingId,
-            category: category.text.trim(),
-            summary: summary.text.trim(),
-            requestedRefundPaise: rupees * 100,
+    if (submitted == true && context.mounted) {
+      final rupees = int.tryParse(refund.text.trim()) ?? 0;
+      try {
+        await ref.read(remoteTrustProvider.notifier).openDispute(
+              bookingId: bookingId,
+              category: category.text.trim(),
+              summary: summary.text.trim(),
+              requestedRefundPaise: rupees * 100,
+            );
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Dispute opened. Unpaid payout is held for review.')),
           );
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Dispute opened. Unpaid payout is held for review.')),
-        );
+        }
+      } catch (error) {
+        if (context.mounted) _showError(context, ref, error);
       }
-    } catch (error) {
-      if (context.mounted) _showError(context, ref, error);
-    } finally {
-      category.dispose();
-      summary.dispose();
-      refund.dispose();
     }
+    category.dispose();
+    summary.dispose();
+    refund.dispose();
   }
 
   Future<void> _run(
@@ -479,9 +474,7 @@ class BookingTrustScreen extends ConsumerWidget {
       await action();
       if (context.mounted) {
         ref.invalidate(bookingTrustProvider(bookingId));
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(success)),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(success)));
       }
     } catch (error) {
       if (context.mounted) _showError(context, ref, error);
@@ -497,6 +490,28 @@ class BookingTrustScreen extends ConsumerWidget {
     final message = ref.read(remoteOperationsProvider.notifier).friendlyError(error);
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
+
+  Widget _section(
+    BuildContext context, {
+    required String title,
+    required List<Widget> children,
+  }) =>
+      Card(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 10),
+              ...children,
+            ],
+          ),
+        ),
+      );
 
   Widget _row(String label, String value) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 5),
