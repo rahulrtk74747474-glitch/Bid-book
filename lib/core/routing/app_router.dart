@@ -9,6 +9,10 @@ import 'package:bid_book/features/communications/presentation/notifications_scre
 import 'package:bid_book/features/groups/presentation/group_detail_screen.dart';
 import 'package:bid_book/features/groups/presentation/groups_screen.dart';
 import 'package:bid_book/features/home/presentation/home_screen.dart';
+import 'package:bid_book/features/operations/presentation/admin_operations_screen.dart';
+import 'package:bid_book/features/operations/presentation/discovery_screen.dart';
+import 'package:bid_book/features/operations/presentation/provider_availability_screen.dart';
+import 'package:bid_book/features/operations/presentation/support_safety_screen.dart';
 import 'package:bid_book/features/profile/presentation/profile_screen.dart';
 import 'package:bid_book/features/provider/presentation/provider_onboarding_screen.dart';
 import 'package:bid_book/features/requests/presentation/post_request_screen.dart';
@@ -113,6 +117,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             ],
           ),
         ],
+      ),
+      GoRoute(
+        path: '/discover',
+        builder: (context, state) => const DiscoveryScreen(),
+      ),
+      GoRoute(
+        path: '/support-safety',
+        builder: (context, state) => const SupportSafetyScreen(),
+      ),
+      GoRoute(
+        path: '/provider/availability',
+        builder: (context, state) => const ProviderAvailabilityScreen(),
+      ),
+      GoRoute(
+        path: '/admin',
+        builder: (context, state) => const AdminOperationsScreen(),
       ),
       GoRoute(
         path: '/notifications',
