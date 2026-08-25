@@ -1,0 +1,156 @@
+name: Phone Test Server + APK
+
+on:
+  push:
+    branches: [temporary-phone-test]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  ENVIRONMENT: development
+  DATABASE_URL: postgresql+asyncpg://bidbook:bidbook_test_password@127.0.0.1:5432/bidbook_test
+  JWT_SECRET: phone-test-jwt-secret-long-enough-for-temporary-ci-testing-only-1234567890
+  OTP_PEPPER: phone-test-otp-pepper-long-enough-for-temporary-ci-testing-only-1234567890
+  EXPOSE_DEVELOPMENT_OTP: "true"
+  AUTO_CREATE_TABLES: "true"
+  OTP_COOLDOWN_SECONDS: "0"
+  OTP_HOURLY_LIMIT: "100"
+
+jobs:
+  phone-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: bidbook_test
+          POSTGRES_USER: bidbook
+          POSTGRES_PASSWORD: bidbook_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bidbook -d bidbook_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+
+      - name: Install backend
+        working-directory: backend
+        run: pip install -e ".[dev]"
+
+      - name: Start BidBook backend
+        working-directory: backend
+        run: |
+          nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 > ../backend.log 2>&1 &
+          echo $! > ../backend.pid
+          for i in {1..40}; do
+            if curl -fsS http://127.0.0.1:8000/health >/dev/null; then
+              echo "Backend is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          cat ../backend.log
+          exit 1
+
+      - name: Install Cloudflare tunnel
+        run: |
+          curl -L --fail --retry 3 \
+            https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 \
+            -o /usr/local/bin/cloudflared
+          chmod +x /usr/local/bin/cloudflared
+          cloudflared --version
+
+      - name: Start public HTTPS tunnel
+        id: tunnel
+        run: |
+          nohup cloudflared tunnel --url http://127.0.0.1:8000 --no-autoupdate > cloudflared.log 2>&1 &
+          echo $! > cloudflared.pid
+          PUBLIC_URL=""
+          for i in {1..60}; do
+            PUBLIC_URL=$(grep -oE 'https://[-a-zA-Z0-9]+\.trycloudflare\.com' cloudflared.log | head -n1 || true)
+            if [ -n "$PUBLIC_URL" ]; then
+              break
+            fi
+            sleep 2
+          done
+          if [ -z "$PUBLIC_URL" ]; then
+            cat cloudflared.log
+            exit 1
+          fi
+          echo "PUBLIC_URL=$PUBLIC_URL" | tee phone-test-url.txt
+          echo "public_url=$PUBLIC_URL" >> "$GITHUB_OUTPUT"
+          for i in {1..30}; do
+            if curl -fsS "$PUBLIC_URL/health" >/dev/null; then
+              echo "Public backend is reachable at $PUBLIC_URL"
+              exit 0
+            fi
+            sleep 2
+          done
+          cat cloudflared.log
+          exit 1
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate Android shell
+        run: |
+          if [ ! -d android ]; then
+            flutter create . --platforms=android --org com.bidbook --project-name bid_book
+          fi
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Build phone-test APK
+        env:
+          PUBLIC_URL: ${{ steps.tunnel.outputs.public_url }}
+        run: |
+          flutter build apk --debug --dart-define=BIDBOOK_API_BASE_URL="$PUBLIC_URL"
+          mkdir -p phone-test-artifact
+          cp build/app/outputs/flutter-apk/app-debug.apk phone-test-artifact/BidBook-Phone-Test.apk
+          cp phone-test-url.txt phone-test-artifact/server-url.txt
+          printf 'This APK works only while this GitHub Actions workflow is still running.\nServer: %s\nDevelopment OTP is displayed inside the app after requesting OTP.\n' "$PUBLIC_URL" > phone-test-artifact/README.txt
+
+      - name: Upload phone-test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: BidBook-Phone-Test-APK
+          path: phone-test-artifact/
+          retention-days: 1
+
+      - name: Keep temporary backend online
+        run: |
+          echo "BidBook temporary test backend is online."
+          echo "Server: ${{ steps.tunnel.outputs.public_url }}"
+          echo "Keeping it alive for 4 hours or until this workflow is cancelled."
+          for i in {1..240}; do
+            if ! kill -0 "$(cat backend.pid)" 2>/dev/null; then
+              echo "Backend stopped unexpectedly"
+              cat backend.log
+              exit 1
+            fi
+            if ! kill -0 "$(cat cloudflared.pid)" 2>/dev/null; then
+              echo "Tunnel stopped unexpectedly"
+              cat cloudflared.log
+              exit 1
+            fi
+            sleep 60
+          done
