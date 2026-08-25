@@ -74,7 +74,7 @@ class OperationsApi {
       if (category?.trim().isNotEmpty == true) 'category': category!.trim(),
       if (area?.trim().isNotEmpty == true) 'area': area!.trim(),
       'verified_only': verifiedOnly,
-      if (weekday != null) 'weekday': weekday,
+      'weekday': weekday,
       'sort': sort,
       'limit': 100,
     });
