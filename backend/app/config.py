@@ -36,8 +36,18 @@ class Settings:
     otp_hourly_limit: int = _int("OTP_HOURLY_LIMIT", 8)
     expose_development_otp: bool = _bool("EXPOSE_DEVELOPMENT_OTP", True)
     auto_create_tables: bool = _bool("AUTO_CREATE_TABLES", False)
+    admin_phones_csv: str = os.getenv("ADMIN_PHONES", "")
+    storage_upload_base_url: str = os.getenv("STORAGE_UPLOAD_BASE_URL", "")
+    storage_public_base_url: str = os.getenv("STORAGE_PUBLIC_BASE_URL", "")
+    platform_fee_bps: int = _int("PLATFORM_FEE_BPS", 0)
+
+    @property
+    def admin_phones(self) -> set[str]:
+        return {item.strip() for item in self.admin_phones_csv.split(",") if item.strip()}
 
     def validate(self) -> None:
+        if not 0 <= self.platform_fee_bps <= 5000:
+            raise RuntimeError("PLATFORM_FEE_BPS must be between 0 and 5000.")
         if self.environment == "production":
             if "development-only" in self.jwt_secret or len(self.jwt_secret) < 48:
                 raise RuntimeError("Production JWT_SECRET must be a strong secret (48+ chars).")
