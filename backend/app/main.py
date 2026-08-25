@@ -20,6 +20,7 @@ from .routers import (
     media_production,
     operations,
     production,
+    production_payments,
     secure_booking,
     trust,
     webhooks,
@@ -86,6 +87,7 @@ app.include_router(trust.router, prefix="/v1")
 app.include_router(operations.router, prefix="/v1")
 app.include_router(secure_booking.router, prefix="/v1")
 app.include_router(production.router, prefix="/v1")
+app.include_router(production_payments.router, prefix="/v1")
 app.include_router(media_production.router, prefix="/v1")
 app.include_router(webhooks.router)
 app.include_router(health.router)
