@@ -1,0 +1,47 @@
+name: Build Standalone Demo APK
+
+on:
+  push:
+    branches: [standalone-demo-apk]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate Android shell
+        run: |
+          if [ ! -d android ]; then
+            flutter create . --platforms=android --org com.bidbook --project-name bid_book
+          fi
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze standalone demo
+        run: flutter analyze lib/demo_main.dart
+
+      - name: Build standalone debug APK
+        run: flutter build apk --debug --target lib/demo_main.dart
+
+      - name: Prepare APK
+        run: |
+          mkdir -p artifacts
+          cp build/app/outputs/flutter-apk/app-debug.apk artifacts/BidBook-Standalone-Demo.apk
+          ls -lh artifacts/BidBook-Standalone-Demo.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: BidBook-Standalone-Demo-APK
+          path: artifacts/BidBook-Standalone-Demo.apk
+          retention-days: 30
