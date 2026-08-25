@@ -1,13 +1,16 @@
+import 'package:bid_book/features/communications/application/remote_communications_controller.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-class AppShell extends StatelessWidget {
+class AppShell extends ConsumerWidget {
   const AppShell({required this.navigationShell, super.key});
 
   final StatefulNavigationShell navigationShell;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final unreadChats = ref.watch(remoteCommunicationsProvider).asData?.value.unreadChats ?? 0;
     return Scaffold(
       body: navigationShell,
       bottomNavigationBar: NavigationBar(
@@ -16,23 +19,32 @@ class AppShell extends StatelessWidget {
           index,
           initialLocation: index == navigationShell.currentIndex,
         ),
-        destinations: const [
-          NavigationDestination(
+        destinations: [
+          const NavigationDestination(
             icon: Icon(Icons.home_outlined),
             selectedIcon: Icon(Icons.home),
             label: 'Home',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.request_quote_outlined),
             selectedIcon: Icon(Icons.request_quote),
             label: 'Requests',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.groups_outlined),
             selectedIcon: Icon(Icons.groups),
             label: 'Groups',
           ),
           NavigationDestination(
+            icon: unreadChats > 0
+                ? Badge.count(count: unreadChats, child: const Icon(Icons.chat_bubble_outline))
+                : const Icon(Icons.chat_bubble_outline),
+            selectedIcon: unreadChats > 0
+                ? Badge.count(count: unreadChats, child: const Icon(Icons.chat_bubble))
+                : const Icon(Icons.chat_bubble),
+            label: 'Chats',
+          ),
+          const NavigationDestination(
             icon: Icon(Icons.person_outline),
             selectedIcon: Icon(Icons.person),
             label: 'Account',
