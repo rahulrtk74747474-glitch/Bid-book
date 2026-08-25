@@ -54,11 +54,10 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
-    volumes:
-      - ${FIREBASE_CREDENTIALS_HOST_PATH:-./secrets/firebase-service-account.json}:/run/secrets/firebase-service-account.json:ro
     networks: [private, edge]
 
   push-worker:
+    profiles: ["push"]
     build:
       context: ./backend
     restart: unless-stopped
