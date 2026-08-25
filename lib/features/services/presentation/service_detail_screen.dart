@@ -1,5 +1,6 @@
 import 'package:bid_book/core/api/api_models.dart';
 import 'package:bid_book/features/marketplace/application/remote_marketplace_controller.dart';
+import 'package:bid_book/features/trust/application/remote_trust_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -20,14 +21,20 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
   Future<void> _book(ApiService service) async {
     setState(() => _booking = true);
     try {
-      final booking = await ref.read(remoteMarketplaceProvider.notifier).directBook(
+      final booking = await ref
+          .read(remoteMarketplaceProvider.notifier)
+          .directBook(
             listingId: service.id,
             scheduledFor: _scheduledFor,
             area: service.area,
           );
       if (mounted) context.go('/bookings/${booking.id}');
     } catch (error) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$error')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$error')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _booking = false);
     }
@@ -41,7 +48,9 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
       initialDate: _scheduledFor,
     );
     if (selected == null || !mounted) return;
-    setState(() => _scheduledFor = DateTime(selected.year, selected.month, selected.day, 10));
+    setState(() {
+      _scheduledFor = DateTime(selected.year, selected.month, selected.day, 10);
+    });
   }
 
   @override
@@ -57,29 +66,61 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
     if (service == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Service')),
-        body: const Center(child: Text('Service not found. Pull Home to refresh.')),
+        body: const Center(
+          child: Text('Service not found. Pull Home to refresh.'),
+        ),
       );
     }
 
     final item = service;
     final isOwnProvider = data?.provider?.id == item.providerId;
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹');
+    final reviews = ref.watch(providerReviewSummaryProvider(item.providerId));
     return Scaffold(
       appBar: AppBar(title: Text(item.title)),
       body: ListView(
         padding: const EdgeInsets.all(18),
         children: [
-          Text(item.title, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+          Text(
+            item.title,
+            style: Theme.of(context)
+                .textTheme
+                .headlineSmall
+                ?.copyWith(fontWeight: FontWeight.w800),
+          ),
           const SizedBox(height: 8),
           Text('${item.category} • ${item.area}'),
           const SizedBox(height: 6),
           Text(item.providerLabel),
+          const SizedBox(height: 8),
+          reviews.when(
+            data: (summary) => Row(
+              children: [
+                const Icon(Icons.star, size: 18),
+                const SizedBox(width: 5),
+                Text(
+                  summary.count == 0
+                      ? 'No completed-job reviews yet'
+                      : '${summary.averageRating?.toStringAsFixed(1) ?? '—'} • ${summary.count} review${summary.count == 1 ? '' : 's'}',
+                ),
+              ],
+            ),
+            loading: () => const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            error: (error, stackTrace) => const SizedBox.shrink(),
+          ),
           const SizedBox(height: 18),
           Text(item.description),
           const SizedBox(height: 24),
           Card(
             child: ListTile(
-              title: Text(currency.format(item.priceRupees), style: const TextStyle(fontWeight: FontWeight.w800)),
+              title: Text(
+                currency.format(item.priceRupees),
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
               subtitle: Text(item.pricingUnit.label),
             ),
           ),
@@ -95,7 +136,13 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
           FilledButton.icon(
             onPressed: isOwnProvider || _booking ? null : () => _book(item),
             icon: const Icon(Icons.book_online_outlined),
-            label: Text(isOwnProvider ? 'This is your listing' : _booking ? 'Booking…' : 'Book service'),
+            label: Text(
+              isOwnProvider
+                  ? 'This is your listing'
+                  : _booking
+                      ? 'Booking…'
+                      : 'Book service',
+            ),
           ),
         ],
       ),

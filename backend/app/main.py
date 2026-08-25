@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
 from .database import create_tables_for_dev
-from .routers import auth, communications, groups, marketplace
+from .routers import auth, communications, groups, marketplace, trust
 
 
 @asynccontextmanager
@@ -18,7 +18,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title=settings.app_name, version="0.3.0", lifespan=lifespan)
+app = FastAPI(title=settings.app_name, version="0.4.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost", "http://127.0.0.1"],
@@ -30,6 +30,7 @@ app.include_router(auth.router, prefix="/v1")
 app.include_router(marketplace.router, prefix="/v1")
 app.include_router(groups.router, prefix="/v1")
 app.include_router(communications.router, prefix="/v1")
+app.include_router(trust.router, prefix="/v1")
 
 
 @app.get("/health")
