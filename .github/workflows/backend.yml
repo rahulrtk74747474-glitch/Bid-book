@@ -41,6 +41,7 @@ jobs:
       EXPOSE_DEVELOPMENT_OTP: "true"
       AUTO_CREATE_TABLES: "true"
       OTP_COOLDOWN_SECONDS: "0"
+      ADMIN_PHONES: "+919876500091"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
