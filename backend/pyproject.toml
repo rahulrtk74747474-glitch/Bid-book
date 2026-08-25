@@ -1,7 +1,7 @@
 [project]
 name = "bidbook-api"
-version = "0.2.0"
-description = "Secure backend API for Bid&Book"
+version = "0.3.0"
+description = "Secure production backend API for Bid&Book"
 requires-python = ">=3.12"
 dependencies = [
   "fastapi==0.141.1",
@@ -9,11 +9,15 @@ dependencies = [
   "SQLAlchemy[asyncio]==2.0.52",
   "asyncpg>=0.29,<1",
   "PyJWT[crypto]==2.13.0",
+  "httpx>=0.28,<1",
+  "alembic==1.19.1",
+  "boto3==1.43.73",
+  "redis==8.1.0",
+  "firebase-admin==7.5.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-  "httpx>=0.28,<1",
   "pytest>=8.4,<9",
   "pytest-asyncio>=1.1,<2",
   "ruff>=0.12,<1",
