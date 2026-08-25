@@ -19,6 +19,11 @@ class HomeScreen extends ConsumerWidget {
         title: const Text('Bid&Book'),
         actions: [
           IconButton(
+            tooltip: 'Find services',
+            onPressed: () => context.push('/discover'),
+            icon: const Icon(Icons.search),
+          ),
+          IconButton(
             tooltip: 'Bookings',
             onPressed: () => context.push('/bookings'),
             icon: const Icon(Icons.event_available_outlined),
@@ -62,6 +67,11 @@ class HomeScreen extends ConsumerWidget {
                 runSpacing: 10,
                 children: [
                   FilledButton.icon(
+                    onPressed: () => context.push('/discover'),
+                    icon: const Icon(Icons.search),
+                    label: const Text('Find services'),
+                  ),
+                  FilledButton.tonalIcon(
                     onPressed: () => context.push('/requests/new'),
                     icon: const Icon(Icons.campaign_outlined),
                     label: const Text('Post request'),
@@ -90,6 +100,10 @@ class HomeScreen extends ConsumerWidget {
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                               fontWeight: FontWeight.w800,
                             )),
+                  ),
+                  TextButton(
+                    onPressed: () => context.push('/discover'),
+                    child: const Text('Filter'),
                   ),
                   IconButton(
                     tooltip: 'Refresh',
