@@ -20,7 +20,7 @@ class BookingsScreen extends ConsumerWidget {
         data: (data) => RefreshIndicator(
           onRefresh: () => ref.read(remoteMarketplaceProvider.notifier).refreshAll(),
           child: data.bookings.isEmpty
-              ? const ListView(children: [SizedBox(height: 220), Center(child: Text('No bookings yet.'))])
+              ? ListView(children: const [SizedBox(height: 220), Center(child: Text('No bookings yet.'))])
               : ListView.separated(
                   padding: const EdgeInsets.all(16),
                   itemCount: data.bookings.length,

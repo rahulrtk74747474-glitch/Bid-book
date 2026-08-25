@@ -38,7 +38,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
               TextField(controller: title, decoration: const InputDecoration(labelText: 'Request title')),
               const SizedBox(height: 10),
               DropdownButtonFormField<String>(
-                value: category,
+                initialValue: category,
                 items: const ['AC Service', 'Electrician', 'Plumber', 'Cleaning', 'Pest Control', 'Other']
                     .map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
                 onChanged: (value) => setLocalState(() => category = value ?? category),
@@ -163,11 +163,11 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(group!.name, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                    Text(group.name, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
                     const SizedBox(height: 4),
-                    Text(group!.area),
+                    Text(group.area),
                     const SizedBox(height: 8),
-                    SelectableText('Invite code: ${group!.inviteCode}', style: const TextStyle(fontWeight: FontWeight.w700)),
+                    SelectableText('Invite code: ${group.inviteCode}', style: const TextStyle(fontWeight: FontWeight.w700)),
                   ]),
                 ),
               ),

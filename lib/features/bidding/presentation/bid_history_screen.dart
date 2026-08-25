@@ -87,11 +87,11 @@ class _BidHistoryScreenState extends ConsumerState<BidHistoryScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           if (request != null) ...[
-            Text(request!.title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+            Text(request.title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
             const SizedBox(height: 6),
-            Text('${request!.category} • ${request!.area}'),
+            Text('${request.category} • ${request.area}'),
             const SizedBox(height: 8),
-            Text(request!.description),
+            Text(request.description),
             const SizedBox(height: 18),
           ],
           if (canBid) ...[

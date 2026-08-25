@@ -26,10 +26,11 @@ class HomeScreen extends ConsumerWidget {
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: () => ref.read(remoteMarketplaceProvider.notifier).refreshAll(),
+        onRefresh: () =>
+            ref.read(remoteMarketplaceProvider.notifier).refreshAll(),
         child: marketplace.when(
-          loading: () => const ListView(
-            children: [SizedBox(height: 280), Center(child: CircularProgressIndicator())],
+          loading: () => ListView(
+            children: const [SizedBox(height: 280), Center(child: CircularProgressIndicator())],
           ),
           error: (error, _) => ListView(
             padding: const EdgeInsets.all(24),
@@ -49,7 +50,9 @@ class HomeScreen extends ConsumerWidget {
             children: [
               Text(
                 'Hi ${auth?.user?.bestName ?? 'there'}',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
               ),
               const SizedBox(height: 6),
               const Text('Book a service, post a need, or combine demand with your neighborhood.'),
@@ -68,7 +71,9 @@ class HomeScreen extends ConsumerWidget {
                         ? () => context.push('/provider/onboarding')
                         : () => context.push('/services/new'),
                     icon: const Icon(Icons.handyman_outlined),
-                    label: Text(data.provider == null ? 'Become a provider' : 'Add service'),
+                    label: Text(data.provider == null
+                        ? 'Become a provider'
+                        : 'Add service'),
                   ),
                   OutlinedButton.icon(
                     onPressed: () => context.go('/groups'),
@@ -81,11 +86,16 @@ class HomeScreen extends ConsumerWidget {
               Row(
                 children: [
                   Expanded(
-                    child: Text('Available services', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                    child: Text('Available services',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            )),
                   ),
                   IconButton(
                     tooltip: 'Refresh',
-                    onPressed: () => ref.read(remoteMarketplaceProvider.notifier).refreshAll(),
+                    onPressed: () => ref
+                        .read(remoteMarketplaceProvider.notifier)
+                        .refreshAll(),
                     icon: const Icon(Icons.refresh),
                   ),
                 ],
@@ -102,11 +112,18 @@ class HomeScreen extends ConsumerWidget {
                 ...data.services.take(20).map((service) => Card(
                       child: ListTile(
                         onTap: () => context.push('/services/${service.id}'),
-                        leading: const CircleAvatar(child: Icon(Icons.home_repair_service_outlined)),
+                        leading: const CircleAvatar(
+                          child: Icon(Icons.home_repair_service_outlined),
+                        ),
                         title: Text(service.title),
-                        subtitle: Text('${service.category} • ${service.area}\n${service.providerLabel}'),
+                        subtitle: Text(
+                          '${service.category} • ${service.area}\n${service.providerLabel}',
+                        ),
                         isThreeLine: true,
-                        trailing: Text(currency.format(service.priceRupees), style: const TextStyle(fontWeight: FontWeight.w800)),
+                        trailing: Text(
+                          currency.format(service.priceRupees),
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
                       ),
                     )),
             ],

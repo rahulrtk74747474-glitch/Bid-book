@@ -91,7 +91,7 @@ class _AddServiceListingScreenState extends ConsumerState<AddServiceListingScree
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _category,
+              initialValue: _category,
               decoration: const InputDecoration(labelText: 'Category'),
               items: _categories.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
               onChanged: (value) => setState(() => _category = value ?? _category),
@@ -122,7 +122,7 @@ class _AddServiceListingScreenState extends ConsumerState<AddServiceListingScree
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<ApiPricingUnit>(
-              value: _unit,
+              initialValue: _unit,
               decoration: const InputDecoration(labelText: 'Pricing basis'),
               items: ApiPricingUnit.values.map((unit) => DropdownMenuItem(value: unit, child: Text(unit.label))).toList(),
               onChanged: (value) => setState(() => _unit = value ?? _unit),

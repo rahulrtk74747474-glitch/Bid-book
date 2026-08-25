@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 class PostRequestScreen extends ConsumerStatefulWidget {
   const PostRequestScreen({super.key});
+
   @override
   ConsumerState<PostRequestScreen> createState() => _PostRequestScreenState();
 }
@@ -18,7 +19,9 @@ class _PostRequestScreenState extends ConsumerState<PostRequestScreen> {
   DateTime _when = DateTime.now().add(const Duration(days: 1));
   bool _saving = false;
 
-  static const _categories = ['AC Service', 'Electrician', 'Plumber', 'Cleaning', 'Carpenter', 'Labour', 'Other'];
+  static const _categories = [
+    'AC Service', 'Electrician', 'Plumber', 'Cleaning', 'Carpenter', 'Labour', 'Other'
+  ];
 
   @override
   void dispose() {
@@ -41,7 +44,9 @@ class _PostRequestScreenState extends ConsumerState<PostRequestScreen> {
           );
       if (mounted) context.go('/requests/${request.id}/bids');
     } catch (error) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$error')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$error')));
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -55,7 +60,10 @@ class _PostRequestScreenState extends ConsumerState<PostRequestScreen> {
       initialDate: _when,
     );
     if (date == null || !mounted) return;
-    final time = await showTimePicker(context: context, initialTime: TimeOfDay.fromDateTime(_when));
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_when),
+    );
     if (time == null) return;
     setState(() => _when = DateTime(date.year, date.month, date.day, time.hour, time.minute));
   }
@@ -75,7 +83,7 @@ class _PostRequestScreenState extends ConsumerState<PostRequestScreen> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: _category,
+                initialValue: _category,
                 decoration: const InputDecoration(labelText: 'Category'),
                 items: _categories.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
                 onChanged: (value) => setState(() => _category = value ?? _category),

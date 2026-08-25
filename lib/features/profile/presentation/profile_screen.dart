@@ -1,3 +1,4 @@
+import 'package:bid_book/core/api/api_models.dart';
 import 'package:bid_book/features/auth/application/remote_auth_controller.dart';
 import 'package:bid_book/features/marketplace/application/remote_marketplace_controller.dart';
 import 'package:flutter/material.dart';
