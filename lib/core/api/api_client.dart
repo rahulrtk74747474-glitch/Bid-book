@@ -22,41 +22,71 @@ class ApiClient {
   final Dio _refreshDio;
   final _expiredController = StreamController<void>.broadcast();
   Future<void>? _refreshFuture;
+  String? _adminStepupToken;
 
   Stream<void> get sessionExpired => _expiredController.stream;
+
+  void setAdminStepupToken(String? token) {
+    _adminStepupToken = token;
+  }
 
   static BaseOptions _options() => BaseOptions(
         baseUrl: ApiConfig.baseUrl,
         connectTimeout: const Duration(seconds: 12),
-        sendTimeout: const Duration(seconds: 15),
-        receiveTimeout: const Duration(seconds: 20),
+        sendTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 30),
         responseType: ResponseType.json,
         headers: const {'Accept': 'application/json'},
       );
 
-  Future<dynamic> get(String path, {Map<String, dynamic>? query}) =>
-      _send('GET', path, query: query);
+  Future<dynamic> get(
+    String path, {
+    Map<String, dynamic>? query,
+    Map<String, dynamic>? headers,
+  }) =>
+      _send('GET', path, query: query, extraHeaders: headers);
 
   Future<dynamic> post(
     String path, {
     Object? data,
     bool authenticated = true,
+    Map<String, dynamic>? headers,
   }) =>
-      _send('POST', path, data: data, authenticated: authenticated);
+      _send(
+        'POST',
+        path,
+        data: data,
+        authenticated: authenticated,
+        extraHeaders: headers,
+      );
 
   Future<dynamic> put(
     String path, {
     Object? data,
     bool authenticated = true,
+    Map<String, dynamic>? headers,
   }) =>
-      _send('PUT', path, data: data, authenticated: authenticated);
+      _send(
+        'PUT',
+        path,
+        data: data,
+        authenticated: authenticated,
+        extraHeaders: headers,
+      );
 
   Future<dynamic> delete(
     String path, {
     Object? data,
     bool authenticated = true,
+    Map<String, dynamic>? headers,
   }) =>
-      _send('DELETE', path, data: data, authenticated: authenticated);
+      _send(
+        'DELETE',
+        path,
+        data: data,
+        authenticated: authenticated,
+        extraHeaders: headers,
+      );
 
   Future<dynamic> _send(
     String method,
@@ -65,12 +95,16 @@ class ApiClient {
     Map<String, dynamic>? query,
     bool authenticated = true,
     bool allowRefresh = true,
+    Map<String, dynamic>? extraHeaders,
   }) async {
     await _sessionStore.ensureLoaded();
-    final headers = <String, dynamic>{};
+    final headers = <String, dynamic>{...?extraHeaders};
     final accessToken = _sessionStore.accessToken;
     if (authenticated && accessToken != null) {
       headers['Authorization'] = 'Bearer $accessToken';
+    }
+    if (path.startsWith('/admin/') && _adminStepupToken != null) {
+      headers['X-Admin-Stepup'] = _adminStepupToken;
     }
 
     try {
@@ -85,7 +119,8 @@ class ApiClient {
       if (authenticated &&
           allowRefresh &&
           error.response?.statusCode == 401 &&
-          _sessionStore.refreshToken != null) {
+          _sessionStore.refreshToken != null &&
+          !path.startsWith('/production/admin/step-up')) {
         await _refreshTokens();
         return _send(
           method,
@@ -94,6 +129,7 @@ class ApiClient {
           query: query,
           authenticated: authenticated,
           allowRefresh: false,
+          extraHeaders: extraHeaders,
         );
       }
       throw ApiException.fromDio(error);
@@ -134,6 +170,7 @@ class ApiClient {
   }
 
   Future<void> _expireSession() async {
+    _adminStepupToken = null;
     await _sessionStore.clearTokens();
     if (!_expiredController.isClosed) _expiredController.add(null);
   }

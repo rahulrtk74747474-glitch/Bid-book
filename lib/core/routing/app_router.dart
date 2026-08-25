@@ -9,10 +9,15 @@ import 'package:bid_book/features/communications/presentation/notifications_scre
 import 'package:bid_book/features/groups/presentation/group_detail_screen.dart';
 import 'package:bid_book/features/groups/presentation/groups_screen.dart';
 import 'package:bid_book/features/home/presentation/home_screen.dart';
-import 'package:bid_book/features/operations/presentation/admin_operations_screen.dart';
 import 'package:bid_book/features/operations/presentation/discovery_screen.dart';
 import 'package:bid_book/features/operations/presentation/provider_availability_screen.dart';
 import 'package:bid_book/features/operations/presentation/support_safety_screen.dart';
+import 'package:bid_book/features/production/presentation/admin_mfa_gate_screen.dart';
+import 'package:bid_book/features/production/presentation/company_team_screen.dart';
+import 'package:bid_book/features/production/presentation/media_manager_screen.dart';
+import 'package:bid_book/features/production/presentation/nearby_services_screen.dart';
+import 'package:bid_book/features/production/presentation/privacy_data_screen.dart';
+import 'package:bid_book/features/production/presentation/provider_business_screen.dart';
 import 'package:bid_book/features/profile/presentation/profile_screen.dart';
 import 'package:bid_book/features/provider/presentation/provider_onboarding_screen.dart';
 import 'package:bid_book/features/requests/presentation/post_request_screen.dart';
@@ -123,16 +128,47 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const DiscoveryScreen(),
       ),
       GoRoute(
+        path: '/nearby',
+        builder: (context, state) => const NearbyServicesScreen(),
+      ),
+      GoRoute(
         path: '/support-safety',
         builder: (context, state) => const SupportSafetyScreen(),
+      ),
+      GoRoute(
+        path: '/privacy-data',
+        builder: (context, state) => const PrivacyDataScreen(),
       ),
       GoRoute(
         path: '/provider/availability',
         builder: (context, state) => const ProviderAvailabilityScreen(),
       ),
       GoRoute(
+        path: '/provider/business',
+        builder: (context, state) => const ProviderBusinessScreen(),
+      ),
+      GoRoute(
+        path: '/provider/team',
+        builder: (context, state) => CompanyTeamScreen(
+          bookingId: state.uri.queryParameters['bookingId'],
+        ),
+      ),
+      GoRoute(
+        path: '/media',
+        builder: (context, state) {
+          final type = state.uri.queryParameters['entityType'];
+          final id = state.uri.queryParameters['entityId'];
+          if (type == null || id == null) {
+            return const Scaffold(
+              body: Center(child: Text('Media target is missing.')),
+            );
+          }
+          return MediaManagerScreen(entityType: type, entityId: id);
+        },
+      ),
+      GoRoute(
         path: '/admin',
-        builder: (context, state) => const AdminOperationsScreen(),
+        builder: (context, state) => const AdminMfaGateScreen(),
       ),
       GoRoute(
         path: '/notifications',
