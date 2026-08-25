@@ -39,7 +39,7 @@ class TrustApi {
 
   Future<TrustPayment> createPayment(String bookingId) async =>
       TrustPayment.fromJson(_map(await _client.post(
-        '/trust/bookings/$bookingId/payment',
+        '/production/bookings/$bookingId/payment',
       )));
 
   Future<TrustPayment> simulateCapture(String paymentId) async =>
