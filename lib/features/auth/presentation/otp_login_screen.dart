@@ -1,4 +1,4 @@
-import 'package:bid_book/features/auth/application/auth_controller.dart';
+import 'package:bid_book/features/auth/application/remote_auth_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -22,7 +22,13 @@ class _OtpLoginScreenState extends ConsumerState<OtpLoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final auth = ref.watch(authControllerProvider);
+    final authAsync = ref.watch(remoteAuthControllerProvider);
+    final auth = authAsync.asData?.value ?? const RemoteAuthState();
+    final booting = authAsync.isLoading && authAsync.asData == null;
+
+    if (booting) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
     return Scaffold(
       body: SafeArea(
@@ -45,12 +51,13 @@ class _OtpLoginScreenState extends ConsumerState<OtpLoginScreen> {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'One verified account to book work, offer services and manage neighborhood requests.',
+                    'One account to book local services, offer work and manage neighborhood buying groups.',
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 30),
                   TextField(
                     controller: _phoneController,
+                    enabled: !auth.busy,
                     keyboardType: TextInputType.phone,
                     decoration: const InputDecoration(
                       labelText: 'Mobile number',
@@ -60,41 +67,48 @@ class _OtpLoginScreenState extends ConsumerState<OtpLoginScreen> {
                   ),
                   const SizedBox(height: 12),
                   FilledButton(
-                    onPressed: () {
-                      ref
-                          .read(authControllerProvider.notifier)
-                          .requestOtp(_phoneController.text);
-                    },
-                    child: Text(auth.otpSent ? 'Resend OTP' : 'Send OTP'),
+                    onPressed: auth.busy
+                        ? null
+                        : () => ref
+                            .read(remoteAuthControllerProvider.notifier)
+                            .requestOtp(_phoneController.text),
+                    child: Text(auth.busy
+                        ? 'Please wait…'
+                        : auth.otpSent
+                            ? 'Resend OTP'
+                            : 'Send OTP'),
                   ),
                   if (auth.otpSent) ...[
                     const SizedBox(height: 24),
                     TextField(
                       controller: _otpController,
+                      enabled: !auth.busy,
                       keyboardType: TextInputType.number,
                       maxLength: 6,
+                      autofillHints: const [AutofillHints.oneTimeCode],
                       decoration: const InputDecoration(
                         labelText: '6-digit OTP',
                         prefixIcon: Icon(Icons.password_outlined),
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: Text(
-                          'Development build: use OTP ${AuthController.developmentOtp}. Production will use a server-issued, expiring OTP and rate limits.',
-                          style: Theme.of(context).textTheme.bodySmall,
+                    if (auth.developmentOtp != null) ...[
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Text(
+                            'Development server OTP: ${auth.developmentOtp}. This value is returned only when the backend explicitly enables development OTP exposure.',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
+                      const SizedBox(height: 8),
+                    ],
                     FilledButton.icon(
-                      onPressed: () {
-                        ref
-                            .read(authControllerProvider.notifier)
-                            .verifyOtp(_otpController.text);
-                      },
+                      onPressed: auth.busy
+                          ? null
+                          : () => ref
+                              .read(remoteAuthControllerProvider.notifier)
+                              .verifyOtp(_otpController.text),
                       icon: const Icon(Icons.login),
                       label: const Text('Verify & continue'),
                     ),

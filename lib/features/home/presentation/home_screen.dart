@@ -1,6 +1,5 @@
-import 'package:bid_book/features/auth/application/auth_controller.dart';
-import 'package:bid_book/features/services/application/service_catalog_controller.dart';
-import 'package:bid_book/features/services/domain/service_listing.dart';
+import 'package:bid_book/features/auth/application/remote_auth_controller.dart';
+import 'package:bid_book/features/marketplace/application/remote_marketplace_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,210 +8,107 @@ import 'package:intl/intl.dart';
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
-  static const _services = [
-    ('AC Service', Icons.ac_unit),
-    ('Electrician', Icons.electrical_services),
-    ('Plumber', Icons.plumbing),
-    ('Cleaning', Icons.cleaning_services),
-    ('Carpenter', Icons.carpenter),
-    ('Labour', Icons.engineering),
-  ];
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final currentUserId = ref.watch(authControllerProvider).user?.id;
-    final listings = ref
-        .watch(serviceCatalogProvider)
-        .where((item) => item.active && item.ownerUserId != currentUserId)
-        .toList();
+    final auth = ref.watch(remoteAuthControllerProvider).asData?.value;
+    final marketplace = ref.watch(remoteMarketplaceProvider);
+    final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹');
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Bid&Book'),
         actions: [
           IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.notifications_none),
+            tooltip: 'Bookings',
+            onPressed: () => context.push('/bookings'),
+            icon: const Icon(Icons.event_available_outlined),
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
-        children: [
-          Text(
-            'Book trusted local work.\nOr let providers bid for it.',
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  height: 1.12,
-                ),
+      body: RefreshIndicator(
+        onRefresh: () => ref.read(remoteMarketplaceProvider.notifier).refreshAll(),
+        child: marketplace.when(
+          loading: () => const ListView(
+            children: [SizedBox(height: 280), Center(child: CircularProgressIndicator())],
           ),
-          const SizedBox(height: 18),
-          TextField(
-            readOnly: true,
-            decoration: const InputDecoration(
-              hintText: 'What service do you need?',
-              prefixIcon: Icon(Icons.search),
-              suffixIcon: Icon(Icons.tune),
-            ),
-            onTap: () => context.go('/requests'),
-          ),
-          const SizedBox(height: 24),
-          Text('Popular services', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 12),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _services.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
-              childAspectRatio: .98,
-            ),
-            itemBuilder: (context, index) {
-              final item = _services[index];
-              return Card(
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(20),
-                  onTap: () => context.go('/requests'),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(item.$2, size: 30),
-                        const SizedBox(height: 10),
-                        Text(item.$1, textAlign: TextAlign.center),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 24),
-          Row(
+          error: (error, _) => ListView(
+            padding: const EdgeInsets.all(24),
             children: [
-              Expanded(
-                child: Text(
-                  'Services near you',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-              ),
-              TextButton(
-                onPressed: () => context.go('/requests'),
-                child: const Text('Requests'),
+              const Icon(Icons.cloud_off_outlined, size: 52),
+              const SizedBox(height: 12),
+              Text('$error', textAlign: TextAlign.center),
+              const SizedBox(height: 12),
+              FilledButton(
+                onPressed: () => ref.invalidate(remoteMarketplaceProvider),
+                child: const Text('Retry'),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          ...listings.take(4).map(
-                (listing) => Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                listing.title,
-                                style: const TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                            if (listing.identityVerified)
-                              const Icon(Icons.verified, size: 18),
-                          ],
-                        ),
-                        const SizedBox(height: 5),
-                        Text('${listing.providerName} • ${listing.area}'),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                '₹${NumberFormat.decimalPattern('en_IN').format(listing.priceRupees.round())} • ${listing.pricingUnit.label}',
-                                style: const TextStyle(fontWeight: FontWeight.w700),
-                              ),
-                            ),
-                            FilledButton(
-                              onPressed: () => context.go('/services/${listing.id}'),
-                              child: const Text('Book'),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-          const SizedBox(height: 12),
-          _FeatureCard(
-            icon: Icons.campaign_outlined,
-            title: 'Post a request',
-            subtitle: 'Describe the job and compare transparent bids.',
-            onTap: () => context.go('/requests/new'),
-          ),
-          const SizedBox(height: 12),
-          _FeatureCard(
-            icon: Icons.groups_outlined,
-            title: 'Neighborhood group buying',
-            subtitle: 'Combine demand, vote, then invite providers to bid.',
-            onTap: () => context.go('/groups'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FeatureCard extends StatelessWidget {
-  const _FeatureCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Row(
+          data: (data) => ListView(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
             children: [
-              CircleAvatar(radius: 27, child: Icon(icon)),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(subtitle),
-                  ],
-                ),
+              Text(
+                'Hi ${auth?.user?.bestName ?? 'there'}',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
               ),
-              const Icon(Icons.arrow_forward),
+              const SizedBox(height: 6),
+              const Text('Book a service, post a need, or combine demand with your neighborhood.'),
+              const SizedBox(height: 20),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  FilledButton.icon(
+                    onPressed: () => context.push('/requests/new'),
+                    icon: const Icon(Icons.campaign_outlined),
+                    label: const Text('Post request'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: data.provider == null
+                        ? () => context.push('/provider/onboarding')
+                        : () => context.push('/services/new'),
+                    icon: const Icon(Icons.handyman_outlined),
+                    label: Text(data.provider == null ? 'Become a provider' : 'Add service'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => context.go('/groups'),
+                    icon: const Icon(Icons.groups_2_outlined),
+                    label: const Text('Neighborhood groups'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 28),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text('Available services', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                  ),
+                  IconButton(
+                    tooltip: 'Refresh',
+                    onPressed: () => ref.read(remoteMarketplaceProvider.notifier).refreshAll(),
+                    icon: const Icon(Icons.refresh),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (data.services.isEmpty)
+                const Card(
+                  child: Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Text('No services have been published yet.'),
+                  ),
+                )
+              else
+                ...data.services.take(20).map((service) => Card(
+                      child: ListTile(
+                        onTap: () => context.push('/services/${service.id}'),
+                        leading: const CircleAvatar(child: Icon(Icons.home_repair_service_outlined)),
+                        title: Text(service.title),
+                        subtitle: Text('${service.category} • ${service.area}\n${service.providerLabel}'),
+                        isThreeLine: true,
+                        trailing: Text(currency.format(service.priceRupees), style: const TextStyle(fontWeight: FontWeight.w800)),
+                      ),
+                    )),
             ],
           ),
         ),
