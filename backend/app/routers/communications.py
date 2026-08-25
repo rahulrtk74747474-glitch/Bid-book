@@ -3,7 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, select
 
 from ..communication_models import ChatMessage, Conversation, ConversationParticipant, Notification, PushDevice
 from ..communication_schemas import (
