@@ -5,12 +5,16 @@ on:
     paths:
       - "backend/**"
       - "docker-compose.backend.yml"
+      - "docker-compose.production.yml"
+      - "deploy/**"
       - ".github/workflows/backend.yml"
   push:
     branches: [main]
     paths:
       - "backend/**"
       - "docker-compose.backend.yml"
+      - "docker-compose.production.yml"
+      - "deploy/**"
       - ".github/workflows/backend.yml"
 
 jobs:
@@ -35,13 +39,18 @@ jobs:
         working-directory: backend
     env:
       ENVIRONMENT: test
+      PUBLIC_API_URL: http://127.0.0.1:8000
       DATABASE_URL: postgresql+asyncpg://bidbook:bidbook_test_password@127.0.0.1:5432/bidbook_test
       JWT_SECRET: test-secret-that-is-long-enough-for-ci-only-not-production-1234567890
       OTP_PEPPER: test-otp-pepper-that-is-long-enough-for-ci-only-1234567890
       EXPOSE_DEVELOPMENT_OTP: "true"
-      AUTO_CREATE_TABLES: "true"
+      AUTO_CREATE_TABLES: "false"
       OTP_COOLDOWN_SECONDS: "0"
       ADMIN_PHONES: "+919876500091"
+      PLATFORM_FEE_BPS: "500"
+      RAZORPAY_WEBHOOK_SECRET: test-razorpay-webhook-secret
+      IDENTITY_WEBHOOK_SECRET: test-identity-webhook-secret
+      PAYOUT_WEBHOOK_SECRET: test-payout-webhook-secret
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -52,8 +61,12 @@ jobs:
       - name: Install
         run: pip install -e ".[dev]"
       - name: Ruff
-        run: ruff check app tests
+        run: ruff check app tests migrations
       - name: Compile
-        run: python -m compileall -q app
+        run: python -m compileall -q app migrations
+      - name: Apply migrations
+        run: alembic upgrade head
+      - name: Verify migration head
+        run: alembic current
       - name: Tests
         run: pytest -q
