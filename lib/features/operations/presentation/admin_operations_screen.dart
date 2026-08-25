@@ -77,7 +77,10 @@ class _AdminOperationsScreenState
       appBar: AppBar(
         title: const Text('Admin operations'),
         actions: [
-          IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh)),
+          IconButton(
+            onPressed: _loading ? null : _load,
+            icon: const Icon(Icons.refresh),
+          ),
         ],
       ),
       body: _loading
@@ -90,7 +93,13 @@ class _AdminOperationsScreenState
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
                     children: [
                       if (_overview != null) ...[
-                        Text('Marketplace health', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                        Text(
+                          'Marketplace health',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
                         const SizedBox(height: 10),
                         Wrap(
                           spacing: 10,
@@ -101,137 +110,215 @@ class _AdminOperationsScreenState
                             _metric('Services', '${_overview!.activeServices}'),
                             _metric('Bookings', '${_overview!.bookings}'),
                             _metric('Completed', '${_overview!.completedBookings}'),
-                            _metric('GMV', currency.format(_overview!.capturedGmvPaise / 100)),
-                            _metric('Open disputes', '${_overview!.openDisputes}'),
+                            _metric(
+                              'GMV',
+                              currency.format(_overview!.capturedGmvPaise / 100),
+                            ),
+                            _metric('Disputes', '${_overview!.openDisputes}'),
                             _metric('Reports', '${_overview!.openReports}'),
                             _metric('Support', '${_overview!.openSupportCases}'),
-                            _metric('Risk signals', '${_overview!.openRiskSignals}'),
-                            _metric('Verifications', '${_overview!.pendingVerifications}'),
-                            _metric('Payout queue', '${_overview!.pendingPayouts}'),
+                            _metric('Risks', '${_overview!.openRiskSignals}'),
+                            _metric(
+                              'Verifications',
+                              '${_overview!.pendingVerifications}',
+                            ),
+                            _metric('Payouts', '${_overview!.pendingPayouts}'),
                           ],
                         ),
                       ],
-                      const SizedBox(height: 24),
-                      _section(
+                      const SizedBox(height: 20),
+                      _queue(
                         'Verification queue',
-                        _verifications.where((item) => item['status'] == 'pending').map((item) => ListTile(
-                              leading: const Icon(Icons.verified_user_outlined),
-                              title: Text('${item['method'] ?? 'verification'}'),
-                              subtitle: Text('User ${_short(item['user_id'])}'),
-                              trailing: Wrap(
-                                spacing: 4,
-                                children: [
-                                  IconButton(
-                                    tooltip: 'Approve',
-                                    onPressed: () => _verification(item, 'verified'),
-                                    icon: const Icon(Icons.check_circle_outline),
+                        _verifications
+                            .where((item) => item['status'] == 'pending')
+                            .map((item) => ListTile(
+                                  leading: const Icon(Icons.verified_user_outlined),
+                                  title: Text('${item['method'] ?? 'Verification'}'),
+                                  subtitle: Text('User ${_short(item['user_id'])}'),
+                                  trailing: Wrap(
+                                    children: [
+                                      IconButton(
+                                        tooltip: 'Approve',
+                                        onPressed: () =>
+                                            _verification(item, 'verified'),
+                                        icon: const Icon(Icons.check_circle_outline),
+                                      ),
+                                      IconButton(
+                                        tooltip: 'Reject',
+                                        onPressed: () =>
+                                            _verification(item, 'rejected'),
+                                        icon: const Icon(Icons.cancel_outlined),
+                                      ),
+                                    ],
                                   ),
-                                  IconButton(
-                                    tooltip: 'Reject',
-                                    onPressed: () => _verification(item, 'rejected'),
-                                    icon: const Icon(Icons.cancel_outlined),
-                                  ),
-                                ],
-                              ),
-                            )),
+                                )),
                       ),
-                      _section(
+                      _queue(
                         'Payout queue',
-                        _payouts.where((item) => ['eligible', 'held', 'pending'].contains(item['status'])).map((item) => ListTile(
-                              leading: const Icon(Icons.account_balance_wallet_outlined),
-                              title: Text(currency.format(((item['amount_paise'] as num?)?.toDouble() ?? 0) / 100)),
-                              subtitle: Text('Status: ${item['status']}'),
-                              trailing: item['status'] == 'eligible'
-                                  ? FilledButton.tonal(onPressed: () => _payout(item, 'paid'), child: const Text('Pay'))
-                                  : item['status'] == 'held'
-                                      ? const Chip(label: Text('Held'))
-                                      : IconButton(onPressed: () => _payout(item, 'held'), icon: const Icon(Icons.pause_circle_outline)),
-                            )),
+                        _payouts
+                            .where((item) =>
+                                ['eligible', 'held', 'pending'].contains(item['status']))
+                            .map((item) => ListTile(
+                                  leading: const Icon(Icons.account_balance_wallet_outlined),
+                                  title: Text(currency.format(
+                                    ((item['amount_paise'] as num?)?.toDouble() ?? 0) /
+                                        100,
+                                  )),
+                                  subtitle: Text('Status: ${item['status']}'),
+                                  trailing: item['status'] == 'eligible'
+                                      ? FilledButton.tonal(
+                                          onPressed: () => _payout(item, 'paid'),
+                                          child: const Text('Pay'),
+                                        )
+                                      : item['status'] == 'held'
+                                          ? const Chip(label: Text('Held'))
+                                          : IconButton(
+                                              onPressed: () => _payout(item, 'held'),
+                                              icon: const Icon(Icons.pause_circle_outline),
+                                            ),
+                                )),
                       ),
-                      _section(
+                      _queue(
                         'Disputes',
-                        _disputes.where((item) => ['open', 'under_review'].contains(item['status'])).map((item) => ListTile(
-                              leading: const Icon(Icons.gavel_outlined),
-                              title: Text('${item['category'] ?? 'Dispute'}'),
-                              subtitle: Text('${item['summary'] ?? ''}'),
-                              trailing: FilledButton.tonal(
-                                onPressed: () => _resolveDispute(item),
-                                child: const Text('Resolve'),
-                              ),
-                            )),
+                        _disputes
+                            .where((item) =>
+                                ['open', 'under_review'].contains(item['status']))
+                            .map((item) => ListTile(
+                                  leading: const Icon(Icons.gavel_outlined),
+                                  title: Text('${item['category'] ?? 'Dispute'}'),
+                                  subtitle: Text('${item['summary'] ?? ''}'),
+                                  trailing: FilledButton.tonal(
+                                    onPressed: () => _resolveDispute(item),
+                                    child: const Text('Resolve'),
+                                  ),
+                                )),
                       ),
-                      _section(
+                      _queue(
                         'Safety reports',
-                        _reports.where((item) => ['open', 'reviewing'].contains(item['status'])).map((item) => ListTile(
-                              leading: const Icon(Icons.flag_outlined),
-                              title: Text('${item['category'] ?? 'Report'}'),
-                              subtitle: Text('${item['summary'] ?? ''}'),
-                              trailing: PopupMenuButton<String>(
-                                onSelected: (value) => _report(item, value),
-                                itemBuilder: (_) => const [
-                                  PopupMenuItem(value: 'resolved', child: Text('Resolve')),
-                                  PopupMenuItem(value: 'dismissed', child: Text('Dismiss')),
-                                ],
-                              ),
-                            )),
+                        _reports
+                            .where((item) =>
+                                ['open', 'reviewing'].contains(item['status']))
+                            .map((item) => ListTile(
+                                  leading: const Icon(Icons.flag_outlined),
+                                  title: Text('${item['category'] ?? 'Report'}'),
+                                  subtitle: Text('${item['summary'] ?? ''}'),
+                                  trailing: PopupMenuButton<String>(
+                                    onSelected: (value) => _report(item, value),
+                                    itemBuilder: (_) => const [
+                                      PopupMenuItem(
+                                        value: 'resolved',
+                                        child: Text('Resolve'),
+                                      ),
+                                      PopupMenuItem(
+                                        value: 'dismissed',
+                                        child: Text('Dismiss'),
+                                      ),
+                                    ],
+                                  ),
+                                )),
                       ),
-                      _section(
+                      _queue(
                         'Support queue',
-                        _support.where((item) => ['open', 'in_progress'].contains(item['status'])).map((item) => ListTile(
-                              leading: const Icon(Icons.support_agent),
-                              title: Text('${item['subject'] ?? 'Support case'}'),
-                              subtitle: Text('${item['category'] ?? ''} • ${item['priority'] ?? ''}'),
-                              trailing: PopupMenuButton<String>(
-                                onSelected: (value) => _supportCase(item, value),
-                                itemBuilder: (_) => const [
-                                  PopupMenuItem(value: 'in_progress', child: Text('Assign / progress')),
-                                  PopupMenuItem(value: 'resolved', child: Text('Resolve')),
-                                ],
-                              ),
-                            )),
+                        _support
+                            .where((item) =>
+                                ['open', 'in_progress'].contains(item['status']))
+                            .map((item) => ListTile(
+                                  leading: const Icon(Icons.support_agent),
+                                  title: Text('${item['subject'] ?? 'Support case'}'),
+                                  subtitle: Text(
+                                    '${item['category'] ?? ''} • ${item['priority'] ?? ''}',
+                                  ),
+                                  trailing: PopupMenuButton<String>(
+                                    onSelected: (value) =>
+                                        _supportCase(item, value),
+                                    itemBuilder: (_) => const [
+                                      PopupMenuItem(
+                                        value: 'in_progress',
+                                        child: Text('Assign / progress'),
+                                      ),
+                                      PopupMenuItem(
+                                        value: 'resolved',
+                                        child: Text('Resolve'),
+                                      ),
+                                    ],
+                                  ),
+                                )),
                       ),
-                      _section(
+                      _queue(
                         'Risk signals',
-                        _risks.where((item) => item['status'] == 'open').map((item) => ListTile(
-                              leading: const Icon(Icons.shield_outlined),
-                              title: Text('${item['kind'] ?? 'Risk signal'} • score ${item['score'] ?? 0}'),
-                              subtitle: Text('${item['detail'] ?? ''}'),
-                              trailing: PopupMenuButton<String>(
-                                onSelected: (value) => _risk(item, value),
-                                itemBuilder: (_) => const [
-                                  PopupMenuItem(value: 'reviewed', child: Text('Reviewed')),
-                                  PopupMenuItem(value: 'dismissed', child: Text('Dismiss')),
-                                ],
-                              ),
-                            )),
+                        _risks
+                            .where((item) => item['status'] == 'open')
+                            .map((item) => ListTile(
+                                  leading: const Icon(Icons.shield_outlined),
+                                  title: Text(
+                                    '${item['kind'] ?? 'Risk signal'} • score ${item['score'] ?? 0}',
+                                  ),
+                                  subtitle: Text('${item['detail'] ?? ''}'),
+                                  trailing: PopupMenuButton<String>(
+                                    onSelected: (value) => _risk(item, value),
+                                    itemBuilder: (_) => const [
+                                      PopupMenuItem(
+                                        value: 'reviewed',
+                                        child: Text('Reviewed'),
+                                      ),
+                                      PopupMenuItem(
+                                        value: 'dismissed',
+                                        child: Text('Dismiss'),
+                                      ),
+                                    ],
+                                  ),
+                                )),
                       ),
-                      _section(
+                      _queue(
                         'Warranty claims',
-                        _warranty.where((item) => ['open', 'under_review'].contains(item['status'])).map((item) => ListTile(
-                              leading: const Icon(Icons.workspace_premium_outlined),
-                              title: Text('${item['issue'] ?? 'Warranty claim'}'),
-                              subtitle: Text('Booking ${_short(item['booking_id'])}'),
-                              trailing: PopupMenuButton<String>(
-                                onSelected: (value) => _warrantyDecision(item, value),
-                                itemBuilder: (_) => const [
-                                  PopupMenuItem(value: 'resolved', child: Text('Resolve')),
-                                  PopupMenuItem(value: 'rejected', child: Text('Reject')),
-                                ],
-                              ),
-                            )),
-                      _section(
+                        _warranty
+                            .where((item) =>
+                                ['open', 'under_review'].contains(item['status']))
+                            .map((item) => ListTile(
+                                  leading: const Icon(Icons.workspace_premium_outlined),
+                                  title: Text('${item['issue'] ?? 'Warranty claim'}'),
+                                  subtitle:
+                                      Text('Booking ${_short(item['booking_id'])}'),
+                                  trailing: PopupMenuButton<String>(
+                                    onSelected: (value) =>
+                                        _warrantyDecision(item, value),
+                                    itemBuilder: (_) => const [
+                                      PopupMenuItem(
+                                        value: 'resolved',
+                                        child: Text('Resolve'),
+                                      ),
+                                      PopupMenuItem(
+                                        value: 'rejected',
+                                        child: Text('Reject'),
+                                      ),
+                                    ],
+                                  ),
+                                )),
+                      ),
+                      _queue(
                         'Users',
                         _users.take(40).map((item) {
                           final suspended = item['suspended_at'] != null;
                           return ListTile(
-                            leading: Icon(suspended ? Icons.person_off_outlined : Icons.person_outline),
-                            title: Text('${item['display_name'] ?? item['phone'] ?? 'User'}'),
-                            subtitle: Text('${item['phone'] ?? ''}${item['identity_verified'] == true ? ' • Verified' : ''}'),
+                            leading: Icon(
+                              suspended
+                                  ? Icons.person_off_outlined
+                                  : Icons.person_outline,
+                            ),
+                            title: Text(
+                              '${item['display_name'] ?? item['phone'] ?? 'User'}',
+                            ),
+                            subtitle: Text(
+                              '${item['phone'] ?? ''}${item['identity_verified'] == true ? ' • Verified' : ''}',
+                            ),
                             trailing: item['is_admin'] == true
                                 ? const Chip(label: Text('Admin'))
                                 : TextButton(
-                                    onPressed: () => suspended ? _restore(item) : _suspend(item),
-                                    child: Text(suspended ? 'Restore' : 'Suspend'),
+                                    onPressed: () => suspended
+                                        ? _restore(item)
+                                        : _suspend(item),
+                                    child:
+                                        Text(suspended ? 'Restore' : 'Suspend'),
                                   ),
                           );
                         }),
@@ -243,7 +330,8 @@ class _AdminOperationsScreenState
   }
 
   Widget _errorView() {
-    final message = _error is ApiException ? (_error as ApiException).message : '$_error';
+    final message =
+        _error is ApiException ? (_error as ApiException).message : '$_error';
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -266,78 +354,133 @@ class _AdminOperationsScreenState
         child: Card(
           child: Padding(
             padding: const EdgeInsets.all(14),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 3),
-              Text(label),
-            ]),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(label),
+              ],
+            ),
           ),
         ),
       );
 
-  Widget _section(String title, Iterable<Widget> children) {
+  Widget _queue(String title, Iterable<Widget> children) {
     final items = children.toList(growable: false);
     return Padding(
-      padding: const EdgeInsets.only(top: 22),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
-          const SizedBox(height: 6),
-          if (items.isEmpty) const Text('Nothing waiting in this queue.') else Card(child: Column(children: items)),
-        ],
+      padding: const EdgeInsets.only(top: 18),
+      child: ExpansionTile(
+        initiallyExpanded: items.isNotEmpty && items.length <= 3,
+        title: Text(
+          '$title (${items.length})',
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ),
+        children: items.isEmpty
+            ? const [
+                ListTile(title: Text('Nothing waiting in this queue.')),
+              ]
+            : items,
       ),
     );
   }
 
-  Future<void> _verification(Map<String, dynamic> item, String status) async {
-    await _action(() => ref.read(operationsApiProvider).decideVerification('${item['id']}', status));
+  Future<void> _verification(
+    Map<String, dynamic> item,
+    String status,
+  ) async {
+    await _action(() => ref
+        .read(operationsApiProvider)
+        .decideVerification('${item['id']}', status));
   }
 
   Future<void> _payout(Map<String, dynamic> item, String status) async {
-    await _action(() => ref.read(operationsApiProvider).processPayout('${item['id']}', status));
+    await _action(() =>
+        ref.read(operationsApiProvider).processPayout('${item['id']}', status));
   }
 
   Future<void> _resolveDispute(Map<String, dynamic> item) async {
-    final controller = TextEditingController(text: 'Reviewed by Bid&Book operations.');
+    final resolution =
+        TextEditingController(text: 'Reviewed by Bid&Book operations.');
     final refund = TextEditingController(text: '0');
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Resolve dispute'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(controller: controller, maxLines: 3, decoration: const InputDecoration(labelText: 'Resolution')),
-          const SizedBox(height: 10),
-          TextField(controller: refund, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Refund ₹')),
-        ]),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: resolution,
+              maxLines: 3,
+              decoration: const InputDecoration(labelText: 'Resolution'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: refund,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Refund ₹'),
+            ),
+          ],
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Resolve')),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Resolve'),
+          ),
         ],
       ),
     );
     if (confirmed == true) {
       final paise = (int.tryParse(refund.text.trim()) ?? 0) * 100;
-      await _action(() => ref.read(operationsApiProvider).resolveDispute(id: '${item['id']}', resolution: controller.text.trim(), refundPaise: paise));
+      await _action(() => ref.read(operationsApiProvider).resolveDispute(
+            id: '${item['id']}',
+            resolution: resolution.text.trim(),
+            refundPaise: paise,
+          ));
     }
-    controller.dispose();
+    resolution.dispose();
     refund.dispose();
   }
 
   Future<void> _report(Map<String, dynamic> item, String status) async {
-    await _action(() => ref.read(operationsApiProvider).decideReport('${item['id']}', status, 'Reviewed by Bid&Book operations.'));
+    await _action(() => ref.read(operationsApiProvider).decideReport(
+          '${item['id']}',
+          status,
+          'Reviewed by Bid&Book operations.',
+        ));
   }
 
   Future<void> _supportCase(Map<String, dynamic> item, String status) async {
-    await _action(() => ref.read(operationsApiProvider).decideSupportCase('${item['id']}', status));
+    await _action(() => ref
+        .read(operationsApiProvider)
+        .decideSupportCase('${item['id']}', status));
   }
 
   Future<void> _risk(Map<String, dynamic> item, String status) async {
-    await _action(() => ref.read(operationsApiProvider).decideRisk('${item['id']}', status));
+    await _action(() =>
+        ref.read(operationsApiProvider).decideRisk('${item['id']}', status));
   }
 
-  Future<void> _warrantyDecision(Map<String, dynamic> item, String status) async {
-    await _action(() => ref.read(operationsApiProvider).decideWarranty('${item['id']}', status, 'Reviewed by Bid&Book operations.'));
+  Future<void> _warrantyDecision(
+    Map<String, dynamic> item,
+    String status,
+  ) async {
+    await _action(() => ref.read(operationsApiProvider).decideWarranty(
+          '${item['id']}',
+          status,
+          'Reviewed by Bid&Book operations.',
+        ));
   }
 
   Future<void> _suspend(Map<String, dynamic> item) async {
@@ -346,21 +489,35 @@ class _AdminOperationsScreenState
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Suspend account'),
-        content: TextField(controller: reason, maxLines: 3, decoration: const InputDecoration(labelText: 'Reason')),
+        content: TextField(
+          controller: reason,
+          maxLines: 3,
+          decoration: const InputDecoration(labelText: 'Reason'),
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Suspend')),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Suspend'),
+          ),
         ],
       ),
     );
     if (confirmed == true && reason.text.trim().length >= 3) {
-      await _action(() => ref.read(operationsApiProvider).suspendUser('${item['id']}', reason.text.trim()));
+      await _action(() => ref
+          .read(operationsApiProvider)
+          .suspendUser('${item['id']}', reason.text.trim()));
     }
     reason.dispose();
   }
 
   Future<void> _restore(Map<String, dynamic> item) async {
-    await _action(() => ref.read(operationsApiProvider).restoreUser('${item['id']}'));
+    await _action(
+      () => ref.read(operationsApiProvider).restoreUser('${item['id']}'),
+    );
   }
 
   Future<void> _action(Future<void> Function() action) async {
@@ -370,7 +527,8 @@ class _AdminOperationsScreenState
     } catch (error) {
       if (!mounted) return;
       final message = error is ApiException ? error.message : '$error';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
