@@ -1,0 +1,36 @@
+name: Build Corrected Phone Test APK
+
+on:
+  push:
+    branches: [fixed-phone-test-apk]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Generate Android shell
+        run: |
+          if [ ! -d android ]; then
+            flutter create . --platforms=android --org com.bidbook --project-name bid_book
+          fi
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Build corrected APK
+        run: |
+          flutter build apk --debug --dart-define=BIDBOOK_API_BASE_URL=https://oriental-bluetooth-areas-tourism.trycloudflare.com/v1
+          mkdir -p artifact
+          cp build/app/outputs/flutter-apk/app-debug.apk artifact/BidBook-Phone-Test-Fixed.apk
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: BidBook-Phone-Test-Fixed-APK
+          path: artifact/BidBook-Phone-Test-Fixed.apk
+          retention-days: 1
