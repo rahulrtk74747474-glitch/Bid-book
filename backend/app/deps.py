@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .database import get_db
 from .models import ProviderProfile, Session, User
-from .security import decode_access_token, utcnow
+from .security import as_utc, decode_access_token, utcnow
 
 Db = Annotated[AsyncSession, Depends(get_db)]
 
@@ -24,7 +24,12 @@ async def current_user(db: Db, authorization: Annotated[str | None, Header()] = 
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid access token") from None
 
     session = await db.get(Session, session_id)
-    if session is None or session.user_id != user_id or session.revoked_at is not None or session.expires_at <= utcnow():
+    if (
+        session is None
+        or session.user_id != user_id
+        or session.revoked_at is not None
+        or as_utc(session.expires_at) <= utcnow()
+    ):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired")
     user = await db.get(User, user_id)
     if user is None or not user.is_active or user.deleted_at is not None:
