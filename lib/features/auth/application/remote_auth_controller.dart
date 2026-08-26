@@ -109,6 +109,9 @@ class RemoteAuthController extends AsyncNotifier<RemoteAuthState> {
     } on ApiException catch (error) {
       state = AsyncData(current.copyWith(busy: false, errorMessage: error.message));
       return false;
+    } catch (_) {
+      state = AsyncData(current.copyWith(busy: false, errorMessage: 'Unable to verify OTP. Check the server and try again.'));
+      return false;
     }
   }
 
@@ -130,6 +133,9 @@ class RemoteAuthController extends AsyncNotifier<RemoteAuthState> {
     } on ApiException catch (error) {
       state = AsyncData(current.copyWith(busy: false, errorMessage: error.message));
       return false;
+    } catch (_) {
+      state = AsyncData(current.copyWith(busy: false, errorMessage: 'Unable to create your email account. Try again.'));
+      return false;
     }
   }
 
@@ -143,6 +149,9 @@ class RemoteAuthController extends AsyncNotifier<RemoteAuthState> {
     } on ApiException catch (error) {
       state = AsyncData(current.copyWith(busy: false, errorMessage: error.message));
       return false;
+    } catch (_) {
+      state = AsyncData(current.copyWith(busy: false, errorMessage: 'Unable to log in with email. Try again.'));
+      return false;
     }
   }
 
@@ -155,6 +164,9 @@ class RemoteAuthController extends AsyncNotifier<RemoteAuthState> {
       return true;
     } on ApiException catch (error) {
       state = AsyncData(current.copyWith(busy: false, errorMessage: error.message));
+      return false;
+    } catch (_) {
+      state = AsyncData(current.copyWith(busy: false, errorMessage: 'Google sign-in failed. Try another sign-in method.'));
       return false;
     }
   }
