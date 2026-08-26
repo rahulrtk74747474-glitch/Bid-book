@@ -23,6 +23,7 @@ from ..schemas import (
     UserOut,
 )
 from ..security import (
+    as_utc,
     create_access_token,
     generate_otp,
     hash_password,
@@ -98,7 +99,7 @@ async def request_otp(payload: OtpRequest, db: Db) -> OtpRequestResult:
         select(OtpChallenge).where(OtpChallenge.phone == phone).order_by(OtpChallenge.created_at.desc()).limit(1)
     )
     latest_challenge = latest.scalar_one_or_none()
-    if latest_challenge and latest_challenge.created_at > cooldown_since:
+    if latest_challenge and as_utc(latest_challenge.created_at) > cooldown_since:
         raise HTTPException(status_code=429, detail="Please wait before requesting another OTP")
 
     hour_ago = now - timedelta(hours=1)
@@ -138,7 +139,7 @@ async def verify_otp(payload: OtpVerify, db: Db, user_agent: str | None = Header
         raise HTTPException(status_code=404, detail="OTP challenge not found")
     if challenge.consumed_at is not None:
         raise HTTPException(status_code=409, detail="OTP challenge already used")
-    if challenge.expires_at <= now:
+    if as_utc(challenge.expires_at) <= now:
         raise HTTPException(status_code=410, detail="OTP expired")
     if challenge.attempts >= challenge.max_attempts:
         raise HTTPException(status_code=429, detail="Too many OTP attempts")
@@ -291,7 +292,7 @@ async def refresh(payload: RefreshRequest, db: Db) -> TokenPair:
     token_hash = refresh_token_hash(payload.refresh_token)
     result = await db.execute(select(Session).where(Session.refresh_hash == token_hash).with_for_update())
     session = result.scalar_one_or_none()
-    if session is None or session.revoked_at is not None or session.expires_at <= now:
+    if session is None or session.revoked_at is not None or as_utc(session.expires_at) <= now:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
     user = await db.get(User, session.user_id)
     if user is None or not user.is_active or user.deleted_at is not None or user.suspended_at is not None:
