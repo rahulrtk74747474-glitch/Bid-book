@@ -24,7 +24,7 @@ class ApiConfig {
     return 'http://127.0.0.1:8000';
   }
 
-  static String get baseUrl => '${serverRoot}/v1';
+  static String get baseUrl => '$serverRoot/v1';
 
   static String absoluteUrl(String value) {
     final trimmed = value.trim();
