@@ -3,6 +3,7 @@ set -euo pipefail
 
 API_URL="${1:-${BIDBOOK_API_BASE_URL:-}}"
 MODE="${BUILD_MODE:-debug}"
+GOOGLE_SERVER_CLIENT_ID="${BIDBOOK_GOOGLE_SERVER_CLIENT_ID:-}"
 
 if [ -z "$API_URL" ]; then
   echo "Usage: bash tools/build_android_apk.sh https://your-api.example.com"
@@ -28,11 +29,19 @@ flutter pub get
 flutter analyze
 flutter test
 
+DART_DEFINES=(--dart-define="BIDBOOK_API_BASE_URL=$API_URL")
+if [ -n "$GOOGLE_SERVER_CLIENT_ID" ]; then
+  DART_DEFINES+=(--dart-define="BIDBOOK_GOOGLE_SERVER_CLIENT_ID=$GOOGLE_SERVER_CLIENT_ID")
+  echo "Google server client ID is included in this build."
+else
+  echo "Google server client ID is not set; Google sign-in will remain disabled."
+fi
+
 if [ "$MODE" = "release" ]; then
-  flutter build apk --release --dart-define="BIDBOOK_API_BASE_URL=$API_URL"
+  flutter build apk --release "${DART_DEFINES[@]}"
   src="build/app/outputs/flutter-apk/app-release.apk"
 else
-  flutter build apk --debug --dart-define="BIDBOOK_API_BASE_URL=$API_URL"
+  flutter build apk --debug "${DART_DEFINES[@]}"
   src="build/app/outputs/flutter-apk/app-debug.apk"
 fi
 
