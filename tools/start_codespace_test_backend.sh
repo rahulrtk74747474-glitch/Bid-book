@@ -11,6 +11,10 @@ export OTP_COOLDOWN_SECONDS=0
 export OTP_HOURLY_LIMIT=100
 export PLATFORM_FEE_BPS=0
 
+if [ -n "${BIDBOOK_GOOGLE_SERVER_CLIENT_ID:-}" ] && [ -z "${GOOGLE_OAUTH_CLIENT_ID:-}" ]; then
+  export GOOGLE_OAUTH_CLIENT_ID="$BIDBOOK_GOOGLE_SERVER_CLIENT_ID"
+fi
+
 if [ -f .venv/bin/activate ]; then
   . .venv/bin/activate
 fi
@@ -32,6 +36,11 @@ for i in $(seq 1 60); do
 done
 
 echo "Bid&Book test backend is running on port 8000."
+if [ -n "${GOOGLE_OAUTH_CLIENT_ID:-}" ]; then
+  echo "Google OAuth verification is configured for this backend."
+else
+  echo "Google OAuth client ID is not set; Google sign-in is disabled for this test backend."
+fi
 
 if [ -n "${CODESPACE_NAME:-}" ]; then
   PUBLIC_URL="https://${CODESPACE_NAME}-8000.app.github.dev"
