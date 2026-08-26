@@ -7,8 +7,11 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 import jwt
+from pwdlib import PasswordHash
 
 from .config import settings
+
+_password_hash = PasswordHash.recommended()
 
 
 def utcnow() -> datetime:
@@ -22,6 +25,27 @@ def normalize_indian_phone(raw: str) -> str:
     if len(digits) != 10 or digits[0] not in "6789":
         raise ValueError("Enter a valid Indian mobile number.")
     return f"+91{digits}"
+
+
+def normalize_email(raw: str) -> str:
+    email = raw.strip().lower()
+    if len(email) > 320 or email.count("@") != 1:
+        raise ValueError("Enter a valid email address.")
+    local, domain = email.split("@", 1)
+    if not local or not domain or "." not in domain or domain.startswith(".") or domain.endswith("."):
+        raise ValueError("Enter a valid email address.")
+    return email
+
+
+def hash_password(password: str) -> str:
+    return _password_hash.hash(password)
+
+
+def verify_password(password: str, encoded: str) -> bool:
+    try:
+        return _password_hash.verify(password, encoded)
+    except Exception:
+        return False
 
 
 def generate_otp() -> str:

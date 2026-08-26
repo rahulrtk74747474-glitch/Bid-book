@@ -32,6 +32,24 @@ class OtpVerify(Model):
     device_id: str | None = Field(default=None, max_length=200)
 
 
+class EmailRegister(Model):
+    display_name: str = Field(min_length=2, max_length=120)
+    email: str = Field(min_length=5, max_length=320)
+    password: str = Field(min_length=8, max_length=128)
+    device_id: str | None = Field(default=None, max_length=200)
+
+
+class EmailLogin(Model):
+    email: str = Field(min_length=5, max_length=320)
+    password: str = Field(min_length=1, max_length=128)
+    device_id: str | None = Field(default=None, max_length=200)
+
+
+class GoogleLogin(Model):
+    id_token: str = Field(min_length=20, max_length=10000)
+    device_id: str | None = Field(default=None, max_length=200)
+
+
 class RefreshRequest(Model):
     refresh_token: str = Field(min_length=32)
 
@@ -45,9 +63,12 @@ class TokenPair(Model):
 
 class UserOut(Model):
     id: UUID
-    phone: str
+    phone: str | None
+    email: str | None
     display_name: str | None
+    avatar_url: str | None
     phone_verified: bool
+    email_verified: bool
     identity_verified: bool
     is_admin: bool
 
@@ -87,6 +108,7 @@ class ServiceOut(ServiceCreate):
     provider_id: UUID
     active: bool
     created_at: datetime
+    cover_photo_url: str | None = None
 
 
 class RequestCreate(Model):
@@ -105,6 +127,7 @@ class RequestOut(RequestCreate):
     accepted_bid_event_id: UUID | None
     booking_id: UUID | None
     created_at: datetime
+    cover_photo_url: str | None = None
 
 
 class BidCreate(Model):

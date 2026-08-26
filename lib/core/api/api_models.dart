@@ -1,26 +1,40 @@
 class ApiUser {
   const ApiUser({
     required this.id,
-    required this.phone,
     required this.phoneVerified,
+    required this.emailVerified,
     required this.identityVerified,
+    this.phone,
+    this.email,
     this.displayName,
+    this.avatarUrl,
   });
 
   final String id;
-  final String phone;
+  final String? phone;
+  final String? email;
   final String? displayName;
+  final String? avatarUrl;
   final bool phoneVerified;
+  final bool emailVerified;
   final bool identityVerified;
 
-  String get bestName =>
-      displayName?.trim().isNotEmpty == true ? displayName!.trim() : phone;
+  String get bestName {
+    if (displayName?.trim().isNotEmpty == true) return displayName!.trim();
+    if (email?.trim().isNotEmpty == true) return email!.split('@').first;
+    return phone?.trim().isNotEmpty == true ? phone!.trim() : 'Bid&Book user';
+  }
+
+  String get primaryContact => email?.trim().isNotEmpty == true ? email!.trim() : (phone ?? '');
 
   factory ApiUser.fromJson(Map<String, dynamic> json) => ApiUser(
         id: json['id'].toString(),
-        phone: json['phone'] as String? ?? '',
+        phone: json['phone'] as String?,
+        email: json['email'] as String?,
         displayName: json['display_name'] as String?,
+        avatarUrl: json['avatar_url'] as String?,
         phoneVerified: json['phone_verified'] as bool? ?? false,
+        emailVerified: json['email_verified'] as bool? ?? false,
         identityVerified: json['identity_verified'] as bool? ?? false,
       );
 }
@@ -36,8 +50,7 @@ class OtpChallengeResult {
   final int expiresInSeconds;
   final String? developmentOtp;
 
-  factory OtpChallengeResult.fromJson(Map<String, dynamic> json) =>
-      OtpChallengeResult(
+  factory OtpChallengeResult.fromJson(Map<String, dynamic> json) => OtpChallengeResult(
         challengeId: json['challenge_id'].toString(),
         expiresInSeconds: json['expires_in_seconds'] as int? ?? 300,
         developmentOtp: json['development_otp'] as String?,
@@ -45,11 +58,7 @@ class OtpChallengeResult {
 }
 
 class AuthResult {
-  const AuthResult({
-    required this.user,
-    required this.accessToken,
-    required this.refreshToken,
-  });
+  const AuthResult({required this.user, required this.accessToken, required this.refreshToken});
 
   final ApiUser user;
   final String accessToken;
@@ -66,9 +75,7 @@ enum ApiProviderKind { individual, company }
 
 extension ApiProviderKindX on ApiProviderKind {
   String get wireName => name;
-  String get label => this == ApiProviderKind.individual
-      ? 'Independent worker'
-      : 'Company';
+  String get label => this == ApiProviderKind.individual ? 'Independent worker' : 'Company';
 }
 
 class ApiProvider {
@@ -390,8 +397,7 @@ class ApiProposalSummary {
   final int maybeCount;
   final int acceptedQuantity;
 
-  factory ApiProposalSummary.fromJson(Map<String, dynamic> json) =>
-      ApiProposalSummary(
+  factory ApiProposalSummary.fromJson(Map<String, dynamic> json) => ApiProposalSummary(
         acceptCount: json['accept_count'] as int? ?? 0,
         rejectCount: json['reject_count'] as int? ?? 0,
         maybeCount: json['maybe_count'] as int? ?? 0,
@@ -405,8 +411,6 @@ Map<String, dynamic> _map(Object? value) {
   throw const FormatException('Expected a JSON object');
 }
 
-DateTime _date(Object? value) =>
-    DateTime.tryParse(value?.toString() ?? '')?.toLocal() ?? DateTime.now();
+DateTime _date(Object? value) => DateTime.tryParse(value?.toString() ?? '')?.toLocal() ?? DateTime.now();
 
-String _shortId(String value) =>
-    value.length <= 8 ? value : value.substring(0, 8).toUpperCase();
+String _shortId(String value) => value.length <= 8 ? value : value.substring(0, 8).toUpperCase();

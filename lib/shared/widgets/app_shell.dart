@@ -22,18 +22,18 @@ class AppShell extends ConsumerWidget {
         destinations: [
           const NavigationDestination(
             icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
+            selectedIcon: Icon(Icons.home_rounded),
             label: 'Home',
           ),
           const NavigationDestination(
             icon: Icon(Icons.request_quote_outlined),
-            selectedIcon: Icon(Icons.request_quote),
+            selectedIcon: Icon(Icons.request_quote_rounded),
             label: 'Requests',
           ),
           const NavigationDestination(
-            icon: Icon(Icons.groups_outlined),
-            selectedIcon: Icon(Icons.groups),
-            label: 'Groups',
+            icon: Icon(Icons.calendar_month_outlined),
+            selectedIcon: Icon(Icons.calendar_month_rounded),
+            label: 'Bookings',
           ),
           NavigationDestination(
             icon: unreadChats > 0
@@ -42,12 +42,12 @@ class AppShell extends ConsumerWidget {
             selectedIcon: unreadChats > 0
                 ? Badge.count(count: unreadChats, child: const Icon(Icons.chat_bubble))
                 : const Icon(Icons.chat_bubble),
-            label: 'Chats',
+            label: 'Chat',
           ),
           const NavigationDestination(
             icon: Icon(Icons.person_outline),
             selectedIcon: Icon(Icons.person),
-            label: 'Account',
+            label: 'Profile',
           ),
         ],
       ),

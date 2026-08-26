@@ -154,7 +154,8 @@ class AdminOverview(Model):
 
 class AdminUserOut(Model):
     id: UUID
-    phone: str
+    phone: str | None
+    email: str | None
     display_name: str | None
     identity_verified: bool
     is_admin: bool

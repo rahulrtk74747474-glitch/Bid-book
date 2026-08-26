@@ -40,6 +40,7 @@ class Settings:
     storage_upload_base_url: str = os.getenv("STORAGE_UPLOAD_BASE_URL", "")
     storage_public_base_url: str = os.getenv("STORAGE_PUBLIC_BASE_URL", "")
     platform_fee_bps: int = _int("PLATFORM_FEE_BPS", 0)
+    google_oauth_client_id: str = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "").strip()
 
     @property
     def admin_phones(self) -> set[str]:

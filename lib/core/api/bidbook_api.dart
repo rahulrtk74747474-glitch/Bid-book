@@ -15,6 +15,11 @@ class BidBookApi {
   final ApiClient _client;
   final SessionStore _sessionStore;
 
+  Future<void> _saveAuth(AuthResult result) => _sessionStore.saveTokens(
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      );
+
   Future<OtpChallengeResult> requestOtp(String phone) async {
     final data = await _client.post('/auth/otp/request', data: {'phone': phone}, authenticated: false);
     return OtpChallengeResult.fromJson(_map(data));
@@ -22,13 +27,49 @@ class BidBookApi {
 
   Future<AuthResult> verifyOtp({required String challengeId, required String otp}) async {
     final deviceId = await _sessionStore.deviceId();
-    final data = await _client.post('/auth/otp/verify', data: {
+    final result = AuthResult.fromJson(_map(await _client.post('/auth/otp/verify', data: {
       'challenge_id': challengeId,
       'otp': otp,
       'device_id': deviceId,
-    }, authenticated: false);
-    final result = AuthResult.fromJson(_map(data));
-    await _sessionStore.saveTokens(accessToken: result.accessToken, refreshToken: result.refreshToken);
+    }, authenticated: false)));
+    await _saveAuth(result);
+    return result;
+  }
+
+  Future<AuthResult> registerEmail({
+    required String displayName,
+    required String email,
+    required String password,
+  }) async {
+    final deviceId = await _sessionStore.deviceId();
+    final result = AuthResult.fromJson(_map(await _client.post('/auth/email/register', data: {
+      'display_name': displayName,
+      'email': email,
+      'password': password,
+      'device_id': deviceId,
+    }, authenticated: false)));
+    await _saveAuth(result);
+    return result;
+  }
+
+  Future<AuthResult> loginEmail({required String email, required String password}) async {
+    final deviceId = await _sessionStore.deviceId();
+    final result = AuthResult.fromJson(_map(await _client.post('/auth/email/login', data: {
+      'email': email,
+      'password': password,
+      'device_id': deviceId,
+    }, authenticated: false)));
+    await _saveAuth(result);
+    return result;
+  }
+
+  Future<AuthResult> loginGoogle(String idToken) async {
+    final deviceId = await _sessionStore.deviceId();
+    final result = AuthResult.fromJson(_map(await _client.post('/auth/google', data: {
+      'id_token': idToken,
+      'device_id': deviceId,
+    }, authenticated: false)));
+    await _saveAuth(result);
     return result;
   }
 
@@ -56,7 +97,12 @@ class BidBookApi {
     return ApiProvider.fromJson(_map(data));
   }
 
-  Future<ApiProvider> upsertProvider({required ApiProviderKind kind, required String displayName, required String serviceArea, String? bio}) async {
+  Future<ApiProvider> upsertProvider({
+    required ApiProviderKind kind,
+    required String displayName,
+    required String serviceArea,
+    String? bio,
+  }) async {
     final data = await _client.put('/providers/me', data: {
       'kind': kind.wireName,
       'display_name': displayName,
@@ -75,7 +121,14 @@ class BidBookApi {
     return _list(data).map(ApiService.fromJson).toList(growable: false);
   }
 
-  Future<ApiService> createService({required String title, required String category, required String description, required String area, required int pricePaise, required ApiPricingUnit pricingUnit}) async {
+  Future<ApiService> createService({
+    required String title,
+    required String category,
+    required String description,
+    required String area,
+    required int pricePaise,
+    required ApiPricingUnit pricingUnit,
+  }) async {
     final data = await _client.post('/services', data: {
       'title': title,
       'category': category,
@@ -100,7 +153,13 @@ class BidBookApi {
     return _list(data).map(ApiRequest.fromJson).toList(growable: false);
   }
 
-  Future<ApiRequest> createRequest({required String title, required String category, required String description, required String area, required DateTime requestedFor}) async {
+  Future<ApiRequest> createRequest({
+    required String title,
+    required String category,
+    required String description,
+    required String area,
+    required DateTime requestedFor,
+  }) async {
     final data = await _client.post('/requests', data: {
       'title': title,
       'category': category,
@@ -153,7 +212,13 @@ class BidBookApi {
     return _list(data).map(ApiProposal.fromJson).toList(growable: false);
   }
 
-  Future<ApiProposal> createProposal({required String groupId, required String title, required String category, required String description, required DateTime preferredFor}) async {
+  Future<ApiProposal> createProposal({
+    required String groupId,
+    required String title,
+    required String category,
+    required String description,
+    required DateTime preferredFor,
+  }) async {
     final data = await _client.post('/groups/$groupId/proposals', data: {
       'title': title,
       'category': category,
@@ -163,7 +228,12 @@ class BidBookApi {
     return ApiProposal.fromJson(_map(data));
   }
 
-  Future<void> vote({required String groupId, required String proposalId, required ApiVoteChoice choice, required int quantity}) async {
+  Future<void> vote({
+    required String groupId,
+    required String proposalId,
+    required ApiVoteChoice choice,
+    required int quantity,
+  }) async {
     await _client.put('/groups/$groupId/proposals/$proposalId/vote', data: {
       'choice': choice.name,
       'quantity': quantity,

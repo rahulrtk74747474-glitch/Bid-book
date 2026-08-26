@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 
 from .config import settings
 from .database import create_tables_for_dev
-from .routers import auth, communications, groups, marketplace, operations, secure_booking, trust
+from .routers import auth, communications, groups, marketplace, media_uploads, operations, secure_booking, trust
 
 
 @asynccontextmanager
@@ -19,7 +19,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title=settings.app_name, version="0.5.0", lifespan=lifespan)
+app = FastAPI(title=settings.app_name, version="0.6.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost", "http://127.0.0.1"],
@@ -46,6 +46,7 @@ app.include_router(groups.router, prefix="/v1")
 app.include_router(communications.router, prefix="/v1")
 app.include_router(trust.router, prefix="/v1")
 app.include_router(operations.router, prefix="/v1")
+app.include_router(media_uploads.router, prefix="/v1")
 app.include_router(secure_booking.router, prefix="/v1")
 
 
