@@ -220,7 +220,7 @@ class HomeScreen extends ConsumerWidget {
                           ),
                         ),
                       const SizedBox(height: 24),
-                      _SectionTitle(title: 'More ways to use Bid&Book'),
+                      const _SectionTitle(title: 'More ways to use Bid&Book'),
                       const SizedBox(height: 10),
                       Row(
                         children: [
