@@ -53,15 +53,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const OtpLoginScreen(),
       ),
       StatefulShellRoute.indexedStack(
-        builder: (context, state, navigationShell) =>
-            AppShell(navigationShell: navigationShell),
+        builder: (context, state, navigationShell) => AppShell(navigationShell: navigationShell),
         branches: [
           StatefulShellBranch(
             routes: [
-              GoRoute(
-                path: '/',
-                builder: (context, state) => const HomeScreen(),
-              ),
+              GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
             ],
           ),
           StatefulShellBranch(
@@ -70,15 +66,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 path: '/requests',
                 builder: (context, state) => const RequestsScreen(),
                 routes: [
-                  GoRoute(
-                    path: 'new',
-                    builder: (context, state) => const PostRequestScreen(),
-                  ),
+                  GoRoute(path: 'new', builder: (context, state) => const PostRequestScreen()),
                   GoRoute(
                     path: ':requestId/bids',
-                    builder: (context, state) => BidHistoryScreen(
-                      requestId: state.pathParameters['requestId']!,
-                    ),
+                    builder: (context, state) => BidHistoryScreen(requestId: state.pathParameters['requestId']!),
                   ),
                 ],
               ),
@@ -87,8 +78,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/groups',
-                builder: (context, state) => const GroupsScreen(),
+                path: '/bookings',
+                builder: (context, state) => const BookingsScreen(),
+                routes: [
+                  GoRoute(
+                    path: ':bookingId',
+                    builder: (context, state) => BookingDetailScreen(bookingId: state.pathParameters['bookingId']!),
+                  ),
+                  GoRoute(
+                    path: ':bookingId/trust',
+                    builder: (context, state) => BookingTrustScreen(bookingId: state.pathParameters['bookingId']!),
+                  ),
+                ],
               ),
             ],
           ),
@@ -100,9 +101,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 routes: [
                   GoRoute(
                     path: ':chatId',
-                    builder: (context, state) => ChatScreen(
-                      chatId: state.pathParameters['chatId']!,
-                    ),
+                    builder: (context, state) => ChatScreen(chatId: state.pathParameters['chatId']!),
                   ),
                 ],
               ),
@@ -110,73 +109,32 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ),
           StatefulShellBranch(
             routes: [
-              GoRoute(
-                path: '/account',
-                builder: (context, state) => const ProfileScreen(),
-              ),
+              GoRoute(path: '/account', builder: (context, state) => const ProfileScreen()),
             ],
           ),
         ],
       ),
+      GoRoute(path: '/discover', builder: (context, state) => const DiscoveryScreen()),
+      GoRoute(path: '/support-safety', builder: (context, state) => const SupportSafetyScreen()),
+      GoRoute(path: '/provider/availability', builder: (context, state) => const ProviderAvailabilityScreen()),
+      GoRoute(path: '/admin', builder: (context, state) => const AdminOperationsScreen()),
+      GoRoute(path: '/notifications', builder: (context, state) => const NotificationsScreen()),
+      GoRoute(path: '/trust', builder: (context, state) => const TrustCenterScreen()),
       GoRoute(
-        path: '/discover',
-        builder: (context, state) => const DiscoveryScreen(),
+        path: '/groups',
+        builder: (context, state) => const GroupsScreen(),
+        routes: [
+          GoRoute(
+            path: ':groupId',
+            builder: (context, state) => GroupDetailScreen(groupId: state.pathParameters['groupId']!),
+          ),
+        ],
       ),
-      GoRoute(
-        path: '/support-safety',
-        builder: (context, state) => const SupportSafetyScreen(),
-      ),
-      GoRoute(
-        path: '/provider/availability',
-        builder: (context, state) => const ProviderAvailabilityScreen(),
-      ),
-      GoRoute(
-        path: '/admin',
-        builder: (context, state) => const AdminOperationsScreen(),
-      ),
-      GoRoute(
-        path: '/notifications',
-        builder: (context, state) => const NotificationsScreen(),
-      ),
-      GoRoute(
-        path: '/trust',
-        builder: (context, state) => const TrustCenterScreen(),
-      ),
-      GoRoute(
-        path: '/groups/:groupId',
-        builder: (context, state) => GroupDetailScreen(
-          groupId: state.pathParameters['groupId']!,
-        ),
-      ),
-      GoRoute(
-        path: '/provider/onboarding',
-        builder: (context, state) => const ProviderOnboardingScreen(),
-      ),
-      GoRoute(
-        path: '/services/new',
-        builder: (context, state) => const AddServiceListingScreen(),
-      ),
+      GoRoute(path: '/provider/onboarding', builder: (context, state) => const ProviderOnboardingScreen()),
+      GoRoute(path: '/services/new', builder: (context, state) => const AddServiceListingScreen()),
       GoRoute(
         path: '/services/:listingId',
-        builder: (context, state) => ServiceDetailScreen(
-          listingId: state.pathParameters['listingId']!,
-        ),
-      ),
-      GoRoute(
-        path: '/bookings',
-        builder: (context, state) => const BookingsScreen(),
-      ),
-      GoRoute(
-        path: '/bookings/:bookingId',
-        builder: (context, state) => BookingDetailScreen(
-          bookingId: state.pathParameters['bookingId']!,
-        ),
-      ),
-      GoRoute(
-        path: '/bookings/:bookingId/trust',
-        builder: (context, state) => BookingTrustScreen(
-          bookingId: state.pathParameters['bookingId']!,
-        ),
+        builder: (context, state) => ServiceDetailScreen(listingId: state.pathParameters['listingId']!),
       ),
     ],
   );
