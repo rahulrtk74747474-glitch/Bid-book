@@ -1,7 +1,7 @@
 name: bid_book
 description: Bid&Book - verified local services marketplace with transparent bidding and neighborhood group buying.
 publish_to: "none"
-version: 0.2.0+2
+version: 0.3.0+3
 
 environment:
   sdk: ">=3.10.0 <4.0.0"
@@ -14,6 +14,8 @@ dependencies:
   flutter_riverpod: ^3.0.0
   flutter_secure_storage: ^10.2.0
   go_router: ^17.0.0
+  google_sign_in: ^6.3.0
+  image_picker: ^1.2.3
   intl: ^0.20.2
   uuid: ^4.5.2
 
