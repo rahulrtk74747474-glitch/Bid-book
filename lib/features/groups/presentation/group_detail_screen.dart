@@ -1,4 +1,5 @@
 import 'package:bid_book/core/api/api_models.dart';
+import 'package:bid_book/core/theme/app_theme.dart';
 import 'package:bid_book/features/auth/application/remote_auth_controller.dart';
 import 'package:bid_book/features/groups/application/remote_group_controller.dart';
 import 'package:flutter/material.dart';
@@ -71,6 +72,16 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
       ),
     );
     if (accepted != true) return;
+
+    if (title.text.trim().length < 2) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a request title.')));
+      return;
+    }
+    if (description.text.trim().length < 2) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Add a short description of what the group needs.')));
+      return;
+    }
+
     setState(() => _loading = true);
     try {
       await ref.read(remoteGroupControllerProvider.notifier).createProposal(
@@ -80,6 +91,9 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
             description: description.text.trim(),
             preferredFor: preferred,
           );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Group request created. Members can now vote.')));
+      }
     } catch (error) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$error')));
     } finally {
@@ -112,6 +126,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
             choice: choice,
             quantity: quantity,
           );
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Vote saved.')));
     } catch (error) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$error')));
     }
@@ -147,12 +162,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
     final isOwner = group?.ownerUserId == userId;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(group?.name ?? 'Group'),
-        actions: [
-          if (isOwner) IconButton(onPressed: _loading ? null : _createProposal, icon: const Icon(Icons.add_comment_outlined), tooltip: 'Raise request'),
-        ],
-      ),
+      appBar: AppBar(title: Text(group?.name ?? 'Group')),
       body: RefreshIndicator(
         onRefresh: () => ref.read(remoteGroupControllerProvider.notifier).loadProposals(widget.groupId),
         child: ListView(
@@ -173,12 +183,23 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
               ),
             const SizedBox(height: 12),
             Row(children: [
-              Expanded(child: Text('Proposals', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800))),
-              if (isOwner) FilledButton.icon(onPressed: _loading ? null : _createProposal, icon: const Icon(Icons.add), label: const Text('Raise')),
+              Expanded(child: Text('Group requests', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800))),
+              if (isOwner)
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(backgroundColor: AppColors.purple),
+                  onPressed: _loading ? null : _createProposal,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Raise group request'),
+                ),
             ]),
             const SizedBox(height: 8),
             if (proposals.isEmpty)
-              const Card(child: Padding(padding: EdgeInsets.all(18), child: Text('No proposals yet. Group admins can raise a service request for members to vote on.')))
+              const Card(
+                child: Padding(
+                  padding: EdgeInsets.all(18),
+                  child: Text('No group requests yet. The group owner can raise a service request for members to vote on.'),
+                ),
+              )
             else
               ...proposals.map((proposal) => _ProposalCard(
                     proposal: proposal,
@@ -205,6 +226,9 @@ class _ProposalCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final summary = ref.watch(proposalSummaryProvider(ProposalKey(groupId, proposal.id)));
+    final acceptCount = summary.asData?.value.acceptCount ?? 0;
+    final canPublishNow = canPublish && acceptCount > 0;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -228,8 +252,21 @@ class _ProposalCard extends ConsumerWidget {
               OutlinedButton(onPressed: () => onVote(ApiVoteChoice.accept), child: const Text('Accept')),
               OutlinedButton(onPressed: () => onVote(ApiVoteChoice.reject), child: const Text('Reject')),
               OutlinedButton(onPressed: () => onVote(ApiVoteChoice.maybe), child: const Text('Maybe')),
-              if (canPublish) FilledButton(onPressed: onPublish, child: const Text('Publish for bidding')),
+              if (canPublish)
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(backgroundColor: AppColors.orange),
+                  onPressed: canPublishNow ? onPublish : null,
+                  icon: const Icon(Icons.campaign_outlined),
+                  label: const Text('Publish for bidding'),
+                ),
             ]),
+            if (canPublish && acceptCount < 1) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'At least one member must tap Accept before this request can be published for provider bidding.',
+                style: TextStyle(color: AppColors.muted, fontSize: 12),
+              ),
+            ],
           ],
           if (proposal.publishedRequestId != null) ...[
             const SizedBox(height: 8),
