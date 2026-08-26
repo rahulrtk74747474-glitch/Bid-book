@@ -3,14 +3,14 @@ name: Temporary Professional Trust macOS APK Builder
 on:
   pull_request:
     branches: [main]
-    types: [synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
 
 jobs:
   build-phone-apk-macos:
-    if: github.head_ref == 'professional-trust-phone-test'
+    if: startsWith(github.head_ref, 'professional-trust-phone-test')
     runs-on: macos-15
     timeout-minutes: 300
     env:
