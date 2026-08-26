@@ -1,0 +1,122 @@
+name: Temporary Professional Trust APK Builder
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  build-phone-apk:
+    if: github.head_ref == 'professional-trust-phone-test'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 300
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: bidbook_phone_test
+          POSTGRES_USER: bidbook
+          POSTGRES_PASSWORD: phone_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bidbook -d bidbook_phone_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql+asyncpg://bidbook:phone_test_password@127.0.0.1:5432/bidbook_phone_test
+      JWT_SECRET: temporary-phone-test-secret-only-never-production-12345678901234567890
+      OTP_PEPPER: temporary-phone-test-otp-pepper-never-production-1234567890
+      EXPOSE_DEVELOPMENT_OTP: "true"
+      AUTO_CREATE_TABLES: "true"
+      OTP_COOLDOWN_SECONDS: "0"
+      OTP_HOURLY_LIMIT: "100"
+      PLATFORM_FEE_BPS: "0"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+
+      - name: Start BidBook test backend
+        run: |
+          cd backend
+          pip install -e ".[dev]"
+          nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 >/tmp/api.log 2>&1 &
+          for i in {1..60}; do
+            curl -fsS http://127.0.0.1:8000/health >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/api.log
+          exit 1
+
+      - name: Seed Professional Trust demo data
+        run: |
+          set -euo pipefail
+          API=http://127.0.0.1:8000/v1
+          login() {
+            R=$(curl -fsS -X POST "$API/auth/otp/request" -H 'Content-Type: application/json' --data "{\"phone\":\"$1\"}")
+            C=$(echo "$R"|jq -r .challenge_id); O=$(echo "$R"|jq -r .development_otp)
+            curl -fsS -X POST "$API/auth/otp/verify" -H 'Content-Type: application/json' --data "{\"challenge_id\":\"$C\",\"otp\":\"$O\",\"device_id\":\"seed\"}"|jq -r .access_token
+          }
+          CUSTOMER=$(login 9876503301); P1=$(login 9876503302); P2=$(login 9876503303)
+          curl -fsS -X PUT "$API/providers/me" -H "Authorization: Bearer $P1" -H 'Content-Type: application/json' --data '{"kind":"individual","display_name":"Sharma AC Care","service_area":"Sonipat","bio":"Trusted AC repair and servicing."}' >/dev/null
+          curl -fsS -X PUT "$API/providers/me" -H "Authorization: Bearer $P2" -H 'Content-Type: application/json' --data '{"kind":"company","display_name":"SparkSafe Electricals","service_area":"Sonipat","bio":"Professional electrical service team."}' >/dev/null
+          curl -fsS -X POST "$API/services" -H "Authorization: Bearer $P1" -H 'Content-Type: application/json' --data '{"title":"Split AC Deep Service","category":"AC Service","description":"Indoor and outdoor unit cleaning with performance check.","area":"Sonipat","price_paise":59900,"pricing_unit":"fixed"}' >/dev/null
+          curl -fsS -X POST "$API/services" -H "Authorization: Bearer $P2" -H 'Content-Type: application/json' --data '{"title":"Home Electrician Visit","category":"Electrician","description":"Diagnosis and minor electrical repair visit.","area":"Sonipat","price_paise":39900,"pricing_unit":"fixed"}' >/dev/null
+          RID=$(curl -fsS -X POST "$API/requests" -H "Authorization: Bearer $CUSTOMER" -H 'Content-Type: application/json' --data '{"title":"AC not cooling properly","category":"AC Service","description":"1.5 ton split AC runs but is not cooling. Need diagnosis and service.","area":"Sector 15, Sonipat","requested_for":"2026-08-30T10:00:00Z"}'|jq -r .id)
+          curl -fsS -X POST "$API/requests/$RID/bids" -H "Authorization: Bearer $P1" -H 'Content-Type: application/json' --data '{"amount_paise":90000,"note":"Initial bid"}' >/dev/null
+          curl -fsS -X POST "$API/requests/$RID/bids" -H "Authorization: Bearer $P1" -H 'Content-Type: application/json' --data '{"amount_paise":74900,"note":"Revised bid"}' >/dev/null
+          curl -fsS -X POST "$API/requests/$RID/bids" -H "Authorization: Bearer $P2" -H 'Content-Type: application/json' --data '{"amount_paise":82000,"note":"Diagnosis included"}' >/dev/null
+
+      - name: Open temporary HTTPS backend
+        run: |
+          curl -L --retry 3 -o cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+          chmod +x cloudflared
+          nohup ./cloudflared tunnel --url http://127.0.0.1:8000 --no-autoupdate >/tmp/tunnel.log 2>&1 &
+          U=""
+          for i in {1..90}; do
+            U=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' /tmp/tunnel.log|head -1||true)
+            [ -n "$U" ] && break
+            sleep 1
+          done
+          [ -n "$U" ] || { cat /tmp/tunnel.log; exit 1; }
+          echo "PUBLIC_URL=$U" >> "$GITHUB_ENV"
+          for i in {1..30}; do curl -fsS "$U/health" >/dev/null && exit 0; sleep 2; done
+          exit 1
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Build Android APK
+        run: |
+          flutter create . --platforms=android --org com.bidbook --project-name bid_book
+          rm -f test/widget_test.dart
+          flutter pub get
+          flutter analyze
+          flutter build apk --release --dart-define=BIDBOOK_API_BASE_URL="$PUBLIC_URL"
+          cp build/app/outputs/flutter-apk/app-release.apk BidBook-Professional-Trust-Test.apk
+          ls -lh BidBook-Professional-Trust-Test.apk
+
+      - name: Upload installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: BidBook-Professional-Trust-Test-APK
+          path: BidBook-Professional-Trust-Test.apk
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Keep backend online for phone testing
+        run: |
+          echo "Temporary API: $PUBLIC_URL"
+          for i in {1..48}; do sleep 300; curl -fsS "$PUBLIC_URL/health" || true; done
