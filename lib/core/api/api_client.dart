@@ -27,36 +27,44 @@ class ApiClient {
 
   static BaseOptions _options() => BaseOptions(
         baseUrl: ApiConfig.baseUrl,
-        connectTimeout: const Duration(seconds: 12),
-        sendTimeout: const Duration(seconds: 15),
-        receiveTimeout: const Duration(seconds: 20),
+        connectTimeout: const Duration(seconds: 15),
+        sendTimeout: const Duration(seconds: 40),
+        receiveTimeout: const Duration(seconds: 40),
         responseType: ResponseType.json,
         headers: const {'Accept': 'application/json'},
       );
 
-  Future<dynamic> get(String path, {Map<String, dynamic>? query}) =>
-      _send('GET', path, query: query);
+  Future<dynamic> get(
+    String path, {
+    Map<String, dynamic>? query,
+    bool authenticated = true,
+    Map<String, dynamic>? headers,
+  }) =>
+      _send('GET', path, query: query, authenticated: authenticated, headers: headers);
 
   Future<dynamic> post(
     String path, {
     Object? data,
     bool authenticated = true,
+    Map<String, dynamic>? headers,
   }) =>
-      _send('POST', path, data: data, authenticated: authenticated);
+      _send('POST', path, data: data, authenticated: authenticated, headers: headers);
 
   Future<dynamic> put(
     String path, {
     Object? data,
     bool authenticated = true,
+    Map<String, dynamic>? headers,
   }) =>
-      _send('PUT', path, data: data, authenticated: authenticated);
+      _send('PUT', path, data: data, authenticated: authenticated, headers: headers);
 
   Future<dynamic> delete(
     String path, {
     Object? data,
     bool authenticated = true,
+    Map<String, dynamic>? headers,
   }) =>
-      _send('DELETE', path, data: data, authenticated: authenticated);
+      _send('DELETE', path, data: data, authenticated: authenticated, headers: headers);
 
   Future<dynamic> _send(
     String method,
@@ -65,12 +73,13 @@ class ApiClient {
     Map<String, dynamic>? query,
     bool authenticated = true,
     bool allowRefresh = true,
+    Map<String, dynamic>? headers,
   }) async {
     await _sessionStore.ensureLoaded();
-    final headers = <String, dynamic>{};
+    final requestHeaders = <String, dynamic>{...?headers};
     final accessToken = _sessionStore.accessToken;
     if (authenticated && accessToken != null) {
-      headers['Authorization'] = 'Bearer $accessToken';
+      requestHeaders['Authorization'] = 'Bearer $accessToken';
     }
 
     try {
@@ -78,7 +87,7 @@ class ApiClient {
         path,
         data: data,
         queryParameters: query,
-        options: Options(method: method, headers: headers),
+        options: Options(method: method, headers: requestHeaders),
       );
       return response.data;
     } on DioException catch (error) {
@@ -94,6 +103,7 @@ class ApiClient {
           query: query,
           authenticated: authenticated,
           allowRefresh: false,
+          headers: headers,
         );
       }
       throw ApiException.fromDio(error);
