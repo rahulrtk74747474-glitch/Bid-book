@@ -10,6 +10,20 @@ if [ -z "$API_URL" ]; then
   exit 2
 fi
 
+# This repository intentionally keeps native platform scaffolding out of source.
+# Generate a clean Android shell when needed without overwriting the existing
+# Bid&Book Flutter source files.
+if [ ! -d android ]; then
+  echo "Android scaffold not found. Generating it now..."
+  tmpdir="$(mktemp -d)"
+  flutter create "$tmpdir/bid_book_android" \
+    --platforms=android \
+    --org com.bidbook \
+    --project-name bid_book
+  cp -R "$tmpdir/bid_book_android/android" ./android
+  rm -rf "$tmpdir"
+fi
+
 flutter pub get
 flutter analyze
 flutter test
