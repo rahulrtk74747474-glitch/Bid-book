@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   build-and-host:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 300
     services:
       postgres:
@@ -69,63 +69,51 @@ jobs:
         run: |
           set -euo pipefail
           API=http://127.0.0.1:8000/v1
-
           otp_login() {
             local phone="$1"
             local requested challenge otp
             requested=$(curl -fsS -X POST "$API/auth/otp/request" -H 'Content-Type: application/json' --data "{\"phone\":\"$phone\"}")
             challenge=$(echo "$requested" | jq -r '.challenge_id')
             otp=$(echo "$requested" | jq -r '.development_otp')
-            curl -fsS -X POST "$API/auth/otp/verify" -H 'Content-Type: application/json' \
-              --data "{\"challenge_id\":\"$challenge\",\"otp\":\"$otp\",\"device_id\":\"seed-$phone\"}" | jq -r '.access_token'
+            curl -fsS -X POST "$API/auth/otp/verify" -H 'Content-Type: application/json' --data "{\"challenge_id\":\"$challenge\",\"otp\":\"$otp\",\"device_id\":\"seed-$phone\"}" | jq -r '.access_token'
           }
-
           CUSTOMER=$(otp_login 9876501101)
           AC=$(otp_login 9876501102)
           ELECTRIC=$(otp_login 9876501103)
           CLEAN=$(otp_login 9876501104)
-
           provider() {
             local token="$1" kind="$2" name="$3" area="$4" bio="$5"
-            curl -fsS -X PUT "$API/providers/me" -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
-              --data "{\"kind\":\"$kind\",\"display_name\":\"$name\",\"service_area\":\"$area\",\"bio\":\"$bio\"}" >/dev/null
+            curl -fsS -X PUT "$API/providers/me" -H "Authorization: Bearer $token" -H 'Content-Type: application/json' --data "{\"kind\":\"$kind\",\"display_name\":\"$name\",\"service_area\":\"$area\",\"bio\":\"$bio\"}" >/dev/null
           }
           provider "$AC" individual "Sharma AC Care" "Sonipat" "AC servicing, installation and repair with transparent pricing."
           provider "$ELECTRIC" company "SparkSafe Electricals" "Sonipat" "Residential electrical repair, wiring and appliance installation."
           provider "$CLEAN" company "FreshHome Services" "Sonipat" "Home deep cleaning and move-in cleaning services."
-
           service() {
             local token="$1" title="$2" category="$3" description="$4" area="$5" price="$6"
-            curl -fsS -X POST "$API/services" -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
-              --data "{\"title\":\"$title\",\"category\":\"$category\",\"description\":\"$description\",\"area\":\"$area\",\"price_paise\":$price,\"pricing_unit\":\"fixed\"}" >/dev/null
+            curl -fsS -X POST "$API/services" -H "Authorization: Bearer $token" -H 'Content-Type: application/json' --data "{\"title\":\"$title\",\"category\":\"$category\",\"description\":\"$description\",\"area\":\"$area\",\"price_paise\":$price,\"pricing_unit\":\"fixed\"}" >/dev/null
           }
           service "$AC" "Split AC Deep Service" "AC Service" "Indoor and outdoor unit cleaning with performance check." "Sonipat" 59900
           service "$AC" "AC Installation Visit" "AC Service" "Installation visit with standard fitting inspection." "Sonipat" 129900
           service "$ELECTRIC" "Home Electrician Visit" "Electrician" "Diagnosis and minor electrical repair visit." "Sonipat" 39900
           service "$ELECTRIC" "Ceiling Fan Installation" "Electrician" "Safe installation and testing of one ceiling fan." "Sonipat" 44900
           service "$CLEAN" "2BHK Deep Cleaning" "Cleaning" "Kitchen, bathrooms, floors and reachable surfaces." "Sonipat" 189900
-
           request() {
             local title="$1" category="$2" description="$3" area="$4" when="$5"
-            curl -fsS -X POST "$API/requests" -H "Authorization: Bearer $CUSTOMER" -H 'Content-Type: application/json' \
-              --data "{\"title\":\"$title\",\"category\":\"$category\",\"description\":\"$description\",\"area\":\"$area\",\"requested_for\":\"$when\"}" | jq -r '.id'
+            curl -fsS -X POST "$API/requests" -H "Authorization: Bearer $CUSTOMER" -H 'Content-Type: application/json' --data "{\"title\":\"$title\",\"category\":\"$category\",\"description\":\"$description\",\"area\":\"$area\",\"requested_for\":\"$when\"}" | jq -r '.id'
           }
           R1=$(request "AC not cooling properly" "AC Service" "1.5 ton split AC runs but is not cooling. Need diagnosis and service." "Sector 15, Sonipat" "2026-08-29T10:00:00Z")
           R2=$(request "Kitchen switchboard repair" "Electrician" "One kitchen switchboard is sparking and needs safe replacement or repair." "Model Town, Sonipat" "2026-08-30T08:30:00Z")
-          R3=$(request "Bathroom tap and leakage" "Plumber" "Tap is leaking continuously and pipe joint below basin may also need repair." "Sector 14, Sonipat" "2026-08-31T06:30:00Z")
-
+          request "Bathroom tap and leakage" "Plumber" "Tap is leaking continuously and pipe joint below basin may also need repair." "Sector 14, Sonipat" "2026-08-31T06:30:00Z" >/dev/null
           bid() {
             local token="$1" request="$2" amount="$3" note="$4"
-            curl -fsS -X POST "$API/requests/$request/bids" -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
-              --data "{\"amount_paise\":$amount,\"note\":\"$note\"}" >/dev/null
+            curl -fsS -X POST "$API/requests/$request/bids" -H "Authorization: Bearer $token" -H 'Content-Type: application/json' --data "{\"amount_paise\":$amount,\"note\":\"$note\"}" >/dev/null
           }
           bid "$AC" "$R1" 90000 "Diagnosis, service and cleaning included."
           bid "$AC" "$R1" 74900 "Revised offer: diagnosis and complete service included."
           bid "$ELECTRIC" "$R1" 82000 "Visit and diagnosis; parts extra if replacement is needed."
           bid "$ELECTRIC" "$R2" 65000 "Labour and standard switchboard replacement included."
           bid "$AC" "$R2" 72000 "Same-day visit possible; material included up to standard board."
-
-          echo "Seeded services, open requests, bids and a real rebid history."
+          echo "Seeded Professional Trust demo data."
 
       - name: Start temporary public HTTPS tunnel
         run: |
@@ -136,21 +124,13 @@ jobs:
           PUBLIC_URL=""
           for i in {1..90}; do
             PUBLIC_URL=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' /tmp/cloudflared.log | head -n1 || true)
-            if [ -n "$PUBLIC_URL" ]; then
-              break
-            fi
+            if [ -n "$PUBLIC_URL" ]; then break; fi
             sleep 1
           done
-          if [ -z "$PUBLIC_URL" ]; then
-            cat /tmp/cloudflared.log
-            exit 1
-          fi
+          if [ -z "$PUBLIC_URL" ]; then cat /tmp/cloudflared.log; exit 1; fi
           echo "PUBLIC_URL=$PUBLIC_URL" >> "$GITHUB_ENV"
-          echo "Temporary API: $PUBLIC_URL"
           for i in {1..30}; do
-            if curl -fsS "$PUBLIC_URL/health" >/dev/null; then
-              exit 0
-            fi
+            if curl -fsS "$PUBLIC_URL/health" >/dev/null; then exit 0; fi
             sleep 2
           done
           cat /tmp/cloudflared.log
@@ -175,8 +155,7 @@ jobs:
 
       - name: Build installable Android APK
         run: |
-          flutter build apk --release \
-            --dart-define=BIDBOOK_API_BASE_URL="$PUBLIC_URL"
+          flutter build apk --release --dart-define=BIDBOOK_API_BASE_URL="$PUBLIC_URL"
           cp build/app/outputs/flutter-apk/app-release.apk BidBook-Professional-Trust-Test.apk
           ls -lh BidBook-Professional-Trust-Test.apk
 
@@ -190,10 +169,8 @@ jobs:
 
       - name: Keep phone test backend online
         run: |
-          echo "BidBook phone test backend will stay online for about four hours."
           echo "API: $PUBLIC_URL"
           for i in {1..48}; do
             sleep 300
-            echo "Still online: $i/48"
             curl -fsS "$PUBLIC_URL/health" || true
           done
