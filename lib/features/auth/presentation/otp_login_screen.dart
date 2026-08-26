@@ -19,8 +19,7 @@ class _OtpLoginScreenState extends ConsumerState<OtpLoginScreen> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _name = TextEditingController();
-  int _mode = 0;
-  bool _createAccount = false;
+  int _mode = 0; // 0 phone, 1 email login, 2 email registration
   bool _obscure = true;
 
   @override
@@ -33,12 +32,20 @@ class _OtpLoginScreenState extends ConsumerState<OtpLoginScreen> {
     super.dispose();
   }
 
+  void _showError(String message) {
+    ref.read(remoteAuthControllerProvider.notifier).showError(message);
+  }
+
+  bool _validEmail(String value) {
+    final email = value.trim();
+    final at = email.indexOf('@');
+    return at > 0 && at < email.length - 3 && email.substring(at + 1).contains('.');
+  }
+
   Future<void> _google() async {
     try {
       if (_googleServerClientId.trim().isEmpty) {
-        ref.read(remoteAuthControllerProvider.notifier).showError(
-              'Google sign-in needs the production Google OAuth client ID. Phone and email login are ready now.',
-            );
+        _showError('Google sign-in is not configured for this test build yet. Use Phone, Email Login, or Register.');
         return;
       }
       final account = await GoogleSignIn(
@@ -49,15 +56,48 @@ class _OtpLoginScreenState extends ConsumerState<OtpLoginScreen> {
       final auth = await account.authentication;
       final token = auth.idToken;
       if (token == null || token.isEmpty) {
-        ref.read(remoteAuthControllerProvider.notifier).showError('Google did not return an ID token.');
+        _showError('Google did not return an ID token.');
         return;
       }
       await ref.read(remoteAuthControllerProvider.notifier).loginGoogle(token);
     } catch (_) {
-      ref.read(remoteAuthControllerProvider.notifier).showError(
-            'Google sign-in is not configured for this test build yet. Use phone or email.',
-          );
+      _showError('Google sign-in is not configured for this test build yet. Use Phone, Email Login, or Register.');
     }
+  }
+
+  Future<void> _loginEmail() async {
+    if (!_validEmail(_email.text)) {
+      _showError('Enter a valid email address.');
+      return;
+    }
+    if (_password.text.isEmpty) {
+      _showError('Enter your password.');
+      return;
+    }
+    await ref.read(remoteAuthControllerProvider.notifier).loginEmail(
+          email: _email.text,
+          password: _password.text,
+        );
+  }
+
+  Future<void> _registerEmail() async {
+    if (_name.text.trim().length < 2) {
+      _showError('Enter your name.');
+      return;
+    }
+    if (!_validEmail(_email.text)) {
+      _showError('Enter a valid email address.');
+      return;
+    }
+    if (_password.text.length < 8) {
+      _showError('Create a password with at least 8 characters.');
+      return;
+    }
+    await ref.read(remoteAuthControllerProvider.notifier).registerEmail(
+          displayName: _name.text,
+          email: _email.text,
+          password: _password.text,
+        );
   }
 
   @override
@@ -150,7 +190,8 @@ class _OtpLoginScreenState extends ConsumerState<OtpLoginScreen> {
                         showSelectedIcon: false,
                         segments: const [
                           ButtonSegment(value: 0, icon: Icon(Icons.phone_android), label: Text('Phone')),
-                          ButtonSegment(value: 1, icon: Icon(Icons.email_outlined), label: Text('Email')),
+                          ButtonSegment(value: 1, icon: Icon(Icons.login), label: Text('Email login')),
+                          ButtonSegment(value: 2, icon: Icon(Icons.person_add_alt_1), label: Text('Register')),
                         ],
                         selected: {_mode},
                         onSelectionChanged: auth.busy
@@ -161,7 +202,12 @@ class _OtpLoginScreenState extends ConsumerState<OtpLoginScreen> {
                               },
                       ),
                       const SizedBox(height: 20),
-                      if (_mode == 0) _phoneForm(auth) else _emailForm(auth),
+                      if (_mode == 0)
+                        _phoneForm(auth)
+                      else if (_mode == 1)
+                        _emailLoginForm(auth)
+                      else
+                        _emailRegisterForm(auth),
                       if (auth.errorMessage != null) ...[
                         const SizedBox(height: 14),
                         Container(
@@ -254,43 +300,13 @@ class _OtpLoginScreenState extends ConsumerState<OtpLoginScreen> {
         ],
       );
 
-  Widget _emailForm(RemoteAuthState auth) => Column(
+  Widget _emailLoginForm(RemoteAuthState auth) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  _createAccount ? 'Create your account' : 'Welcome back',
-                  style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
-                ),
-              ),
-              TextButton(
-                onPressed: auth.busy
-                    ? null
-                    : () {
-                        ref.read(remoteAuthControllerProvider.notifier).clearError();
-                        setState(() => _createAccount = !_createAccount);
-                      },
-                child: Text(_createAccount ? 'Log in' : 'Create account'),
-              ),
-            ],
-          ),
+          const Text('Log in with email', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
           const SizedBox(height: 5),
-          Text(
-            _createAccount ? 'One account lets you book services and offer work.' : 'Sign in using your Bid&Book email.',
-            style: const TextStyle(color: AppColors.muted),
-          ),
+          const Text('Use an email account you already registered with Bid&Book.', style: TextStyle(color: AppColors.muted)),
           const SizedBox(height: 14),
-          if (_createAccount) ...[
-            TextField(
-              controller: _name,
-              enabled: !auth.busy,
-              textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(labelText: 'Your name', prefixIcon: Icon(Icons.person_outline)),
-            ),
-            const SizedBox(height: 12),
-          ],
           TextField(
             controller: _email,
             enabled: !auth.busy,
@@ -299,41 +315,82 @@ class _OtpLoginScreenState extends ConsumerState<OtpLoginScreen> {
             decoration: const InputDecoration(labelText: 'Email address', prefixIcon: Icon(Icons.email_outlined)),
           ),
           const SizedBox(height: 12),
-          TextField(
-            controller: _password,
-            enabled: !auth.busy,
-            obscureText: _obscure,
-            decoration: InputDecoration(
-              labelText: _createAccount ? 'Password (8+ characters)' : 'Password',
-              prefixIcon: const Icon(Icons.lock_outline),
-              suffixIcon: IconButton(
-                onPressed: () => setState(() => _obscure = !_obscure),
-                icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-              ),
-            ),
-          ),
+          _passwordField(auth, label: 'Password'),
           const SizedBox(height: 14),
           FilledButton.icon(
+            onPressed: auth.busy ? null : _loginEmail,
+            icon: const Icon(Icons.login),
+            label: Text(auth.busy ? 'Please wait…' : 'Log in with email'),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
             onPressed: auth.busy
                 ? null
                 : () {
-                    if (_createAccount) {
-                      ref.read(remoteAuthControllerProvider.notifier).registerEmail(
-                            displayName: _name.text,
-                            email: _email.text,
-                            password: _password.text,
-                          );
-                    } else {
-                      ref.read(remoteAuthControllerProvider.notifier).loginEmail(
-                            email: _email.text,
-                            password: _password.text,
-                          );
-                    }
+                    ref.read(remoteAuthControllerProvider.notifier).clearError();
+                    setState(() => _mode = 2);
                   },
-            icon: Icon(_createAccount ? Icons.person_add_alt_1 : Icons.login),
-            label: Text(auth.busy ? 'Please wait…' : _createAccount ? 'Create Bid&Book account' : 'Log in with email'),
+            icon: const Icon(Icons.person_add_alt_1),
+            label: const Text('New here? Register with email'),
           ),
         ],
+      );
+
+  Widget _emailRegisterForm(RemoteAuthState auth) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text('Register with email', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 5),
+          const Text('Create one Bid&Book account for booking services and offering work.', style: TextStyle(color: AppColors.muted)),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _name,
+            enabled: !auth.busy,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(labelText: 'Your name', prefixIcon: Icon(Icons.person_outline)),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _email,
+            enabled: !auth.busy,
+            keyboardType: TextInputType.emailAddress,
+            autocorrect: false,
+            decoration: const InputDecoration(labelText: 'Email address', prefixIcon: Icon(Icons.email_outlined)),
+          ),
+          const SizedBox(height: 12),
+          _passwordField(auth, label: 'Create password (8+ characters)'),
+          const SizedBox(height: 14),
+          FilledButton.icon(
+            onPressed: auth.busy ? null : _registerEmail,
+            icon: const Icon(Icons.person_add_alt_1),
+            label: Text(auth.busy ? 'Please wait…' : 'Register with email'),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: auth.busy
+                ? null
+                : () {
+                    ref.read(remoteAuthControllerProvider.notifier).clearError();
+                    setState(() => _mode = 1);
+                  },
+            icon: const Icon(Icons.login),
+            label: const Text('Already registered? Log in'),
+          ),
+        ],
+      );
+
+  Widget _passwordField(RemoteAuthState auth, {required String label}) => TextField(
+        controller: _password,
+        enabled: !auth.busy,
+        obscureText: _obscure,
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: const Icon(Icons.lock_outline),
+          suffixIcon: IconButton(
+            onPressed: () => setState(() => _obscure = !_obscure),
+            icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+          ),
+        ),
       );
 }
 
