@@ -18,6 +18,19 @@ def utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+def as_utc(value: datetime) -> datetime:
+    """Return an aware UTC datetime even when a DB driver returns a naive value.
+
+    PostgreSQL preserves timezone-aware values for DateTime(timezone=True), while
+    SQLite commonly returns the same stored timestamp without tzinfo. Development
+    and phone-test builds use SQLite, so normalize values before Python-side
+    comparisons to keep auth/session expiry checks portable across both databases.
+    """
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
 def normalize_indian_phone(raw: str) -> str:
     digits = "".join(ch for ch in raw if ch.isdigit())
     if len(digits) == 12 and digits.startswith("91"):
